@@ -67,7 +67,7 @@ function randunitary(basis::SymplecticBasis{N}; passive = false, ħ = 2) where {
 end
 function _randunitary(basis::SymplecticBasis{N}; passive = false) where {N<:Int}
     nmodes = basis.nmodes
-    disp = rand(2*nmodes)
+    disp = randn(2*nmodes)
     symp = randsymplectic(basis, passive = passive)
     return disp, symp
 end
@@ -182,7 +182,7 @@ end
 # This approach is faster and creates less allocations than rand(Haar(2), nmodes) from RandomMatrices.jl
 function _rand_unitary(basis::SymplecticBasis{N}) where {N<:Int}
     nmodes = basis.nmodes
-    M = rand(ComplexF64, nmodes, nmodes) ./ sqrt(2.0)
+    M = randn(ComplexF64, nmodes, nmodes) ./ sqrt(2.0)
     q, r = qr(M)
     d = Diagonal([r[i, i] / abs(r[i, i]) for i in Base.OneTo(nmodes)])
     return q * d
