@@ -1,7 +1,5 @@
 struct Homodyne{R,S<:GaussianState} <: Gabs.AbstractGaussianMeasurement
-    # measurement result
     result::R
-    # evolved Gaussian state
     state::S
     function Homodyne(r::R, s::S) where {R,S<:GaussianState}
         return new{R,S}(r, s)
@@ -78,18 +76,15 @@ function homodyne(
     indices::R, 
     angles::G
 ) where {Tm,Tc,R,G}
-    # high-level user input error checks
     basis = state.basis
     nmodes = basis.nmodes
     indlength = length(indices)
     indlength < nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
-
     # perform conditional mapping of Gaussian quantum state
     result′, a, A = _homodyne_filter(state, indices, angles)
     mean′ = zeros(eltype(Tm), 2*nmodes)
     covar′ = Matrix{eltype(Tc)}((state.ħ/2)*I, 2*nmodes, 2*nmodes)
-    
     # fill in measured modes with vacuum states 
     notindices = setdiff(1:nmodes, indices)
     @inbounds for i in eachindex(notindices)
@@ -107,7 +102,6 @@ function homodyne(
             covar′[2*otheridx, 2*idx] = A[2*j, 2*i]
         end
     end
-    
     # promote output array type to ensure it matches the input array type
     mean′′ = Gabs._promote_output_vector(Tm, mean′, 2*nmodes)
     covar′′ = Gabs._promote_output_matrix(Tc, covar′, 2*nmodes)
@@ -119,20 +113,16 @@ function homodyne(
     indices::R, 
     angles::G
 ) where {Tm,Tc,R,G}
-    
-    # high-level user input error checks
     basis = state.basis
     nmodes = basis.nmodes
     indlength = length(indices)
     indlength < nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
-
     # perform conditional mapping of Gaussian quantum state
     result′, a, A = _homodyne_filter(state, indices, angles)
     mean′ = zeros(eltype(Tm), 2*nmodes)
     covar′ = Matrix{eltype(Tc)}((state.ħ/2)*I, 2*nmodes, 2*nmodes)
     nmodes′ = nmodes - length(indices)
-    
     # fill in measured modes with vacuum states
     notindices = setdiff(1:nmodes, indices)
     @inbounds for i in eachindex(notindices)
@@ -151,7 +141,6 @@ function homodyne(
             covar′[otheridx+nmodes,idx+nmodes] = A[j+nmodes′,i+nmodes′]
         end
     end
-    
     # promote output array type to ensure it matches the input array type
     mean′′ = Gabs._promote_output_vector(Tm, mean′, 2*nmodes)
     covar′′ = Gabs._promote_output_matrix(Tc, covar′, 2*nmodes)
@@ -189,14 +178,12 @@ function Base.rand(
     angles::G; 
     shots::Int = 1
 ) where {Tm,Tc,R,G}
-    # high-level user input error checks
     basis = state.basis
     indlength = length(indices)
     indlength < basis.nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
     nmodes′ = basis.nmodes - indlength
     mean, covar = state.mean, state.covar
-    
     # write mean and covariance matrix of measured modes to vector `b` and matrix `B`, respectively
     b, B = zeros(2*indlength), zeros(2*indlength, 2*indlength)
     @inbounds for i in eachindex(indices)
@@ -212,7 +199,6 @@ function Base.rand(
             end
         end
     end
-    
     # infinite squeezing along axis defined by `angles`
     @inbounds for i in Base.OneTo(indlength)
         θ = angles[i]
@@ -223,7 +209,6 @@ function Base.rand(
         B[i+indlength,i] += ct * st * (sq - 1 / sq)
         B[i+indlength,i+indlength] += st^2 * sq + ct^2 / sq
     end
-
     # sample from probability distribution by taking the displaced 
     # Cholesky decomposition of the covariance matrix
     symB = Symmetric(B)
@@ -243,7 +228,6 @@ function Base.rand(
     angles::G;
     shots::Int = 1
 ) where {Tm,Tc,R,G}
-    # high-level user input error checks
     basis = state.basis
     nmodes = basis.nmodes
     indlength = length(indices)
@@ -251,7 +235,6 @@ function Base.rand(
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
     nmodes′ = nmodes - indlength
     mean, covar = state.mean, state.covar
-    
     # write mean and covariance matrix of measured modes to vector `b` and matrix `B`, respectively
     b, B = zeros(2*indlength), zeros(2*indlength, 2*indlength)
     @inbounds for i in eachindex(indices)
@@ -278,7 +261,6 @@ function Base.rand(
             end
         end
     end
-    
     # infinite squeezing along axis defined by `angles`
     @inbounds for i in Base.OneTo(indlength)
         θ = angles[i]
@@ -289,7 +271,6 @@ function Base.rand(
         B[i+indlength,i] += ct * st * (sq - 1 / sq)
         B[i+indlength,i+indlength] += st^2 * sq + ct^2 / sq
     end
-
     # sample from probability distribution by taking the displaced 
     # Cholesky decomposition of the covariance matrix
     symB = Symmetric(B)
@@ -308,13 +289,10 @@ function _homodyne_filter(
     indices::R, 
     angles::G
 ) where {Tm,Tc,R,G}
-
-    # retrieve basis, mean vector, and covariance matrix information about input state
     basis = state.basis
     indlength = length(indices)
     nmodes′ = basis.nmodes - indlength
     a, b, A, B, C = _part_state(state, indices)
-    
     # infinite squeezing along axis defined by `angles`
     @inbounds for i in Base.OneTo(indlength)
         θ = angles[i]
@@ -325,19 +303,16 @@ function _homodyne_filter(
         B[2i,2i-1] += ct * st * (sq - 1 / sq)
         B[2i,2i] += st^2 * sq + ct^2 / sq
     end
-    
     # sample from probability distribution by taking the displaced 
     # Cholesky decomposition of the covariance matrix
     symB = Symmetric(B)
     L = cholesky(symB).L
     resultmean = L * randn(2*indlength) + b
     meandiff = resultmean - b
-    
     # conditional mapping (see Serafini's Quantum Continuous Variables textbook for reference)
     buf = C * inv(symB)
     a .+= buf * meandiff
     A .-= buf * C'
-
     # promote output array type to ensure it matches the input array type
     result′ = Gabs._promote_output_vector(Tm, resultmean, 2*indlength)
     return result′, a, A
@@ -347,12 +322,10 @@ function _homodyne_filter(
     indices::R, 
     angles::G
 ) where {Tm,Tc,R,G}
-    # retrieve basis, mean vector, and covariance matrix information about input state
     basis = state.basis
     indlength = length(indices)
     nmodes′ = basis.nmodes - indlength
     a, b, A, B, C = _part_state(state, indices)
-    
     # infinite squeezing along axis defined by `angles`
     @inbounds for i in Base.OneTo(indlength)
         θ = angles[i]
@@ -363,19 +336,16 @@ function _homodyne_filter(
         B[i+indlength,i] += ct * st * (sq - 1 / sq)
         B[i+indlength,i+indlength] += st^2 * sq + ct^2 / sq
     end
-    
     # sample from probability distribution by taking the displaced 
     # Cholesky decomposition of the covariance matrix
     symB = Symmetric(B)
     L = cholesky(symB).L
     resultmean = L * randn(2*indlength) + b
     meandiff = resultmean - b
-    
     # conditional mapping (see Serafini's Quantum Continuous Variables textbook for reference)
     buf = C * inv(symB)
     a .+= buf * meandiff
     A .-= buf * C'
-
     # promote output array type to ensure it matches the input array type
     result′ = Gabs._promote_output_vector(Tm, resultmean, 2*indlength)
     return result′, a, A
