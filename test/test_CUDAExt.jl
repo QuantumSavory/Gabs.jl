@@ -1,4 +1,4 @@
-@testitem "GPU Foundation - State Creation" begin
+@testitem "GPU Foundation - State Creation" tags=[:cuda] begin
     using CUDA
     using Gabs
     using Gabs: device
@@ -110,7 +110,7 @@
     end
 end
 
-@testitem "GPU Foundation - Unitary Operations" begin
+@testitem "GPU Foundation - Unitary Operations" tags=[:cuda] begin
     using Gabs
     using Gabs: device
     using LinearAlgebra
@@ -200,7 +200,7 @@ end
     end
 end
 
-@testitem "GPU Foundation - Channel Operations" begin
+@testitem "GPU Foundation - Channel Operations" tags=[:cuda] begin
     using Gabs
     using Gabs: device
     using LinearAlgebra
@@ -238,7 +238,7 @@ end
     end
 end
 
-@testitem "GPU Foundation - Wigner Functions" begin
+@testitem "GPU Foundation - Wigner Functions" tags=[:cuda] begin
     using Gabs
     using Gabs: device
     using LinearAlgebra
@@ -321,7 +321,7 @@ end
     end
 end
 
-@testitem "GPU Foundation - Tensor Products and Partial Traces" begin
+@testitem "GPU Foundation - Tensor Products and Partial Traces" tags=[:cuda] begin
     using Gabs
     using Gabs: device
     using LinearAlgebra
@@ -376,7 +376,7 @@ end
     end
 end
 
-@testitem "GPU Foundation - Device Management" begin
+@testitem "GPU Foundation - Device Management" tags=[:cuda] begin
     using Gabs
     using Gabs: device
     using LinearAlgebra
@@ -430,8 +430,7 @@ end
     end
 end
 
-#tensor tests
-@testitem "GPU Tensor Products - Operators" begin
+@testitem "GPU Tensor Products - Operators" tags=[:cuda] begin
     using CUDA
     using Gabs
     using Gabs: device
@@ -508,7 +507,7 @@ end
     end
 end
 
-@testitem "GPU Linear Combinations - Core Functionality" begin
+@testitem "GPU Linear Combinations - Core Functionality" tags=[:cuda] begin
     using CUDA
     using Gabs
     using Gabs: device, GaussianLinearCombination
@@ -812,7 +811,7 @@ end
     end
 end
 
-@testitem "GPU Linear Combinations Further Coverage" begin
+@testitem "GPU Linear Combinations Further Coverage" tags=[:cuda] begin
     using CUDA
     using Gabs
     using Gabs: device, GaussianLinearCombination
@@ -1131,7 +1130,7 @@ end
     end
 end
 
-@testitem "GPU Basis Operations" begin
+@testitem "GPU Basis Operations" tags=[:cuda] begin
     using Gabs
     using Gabs: device, GaussianLinearCombination
     using CUDA
@@ -1457,7 +1456,7 @@ end
     end
 end
 
-@testitem "GPU Random Generation Suite" begin
+@testitem "GPU Random Generation Suite" tags=[:cuda] begin
     using Gabs
     using Gabs: device, GaussianState, GaussianUnitary, GaussianChannel
     using CUDA
@@ -1708,7 +1707,7 @@ end
     end
 end
 
-@testitem "GPU Cross-Wigner Foundation - single thread, but accuracy tests" begin
+@testitem "GPU Cross-Wigner Foundation - single thread, but accuracy tests" tags=[:cuda] begin
     using Gabs
     using Gabs: device, cross_wigner, cross_wignerchar
     using LinearAlgebra
@@ -1889,7 +1888,7 @@ end
     end
 end
 
-@testitem "GPU Full Interference Wigner Functions" begin
+@testitem "GPU Full Interference Wigner Functions" tags=[:cuda] begin
     using Gabs
     using Gabs: device
     using LinearAlgebra
@@ -2081,146 +2080,146 @@ end
     end
 end
 
-@testitem "GPU Batched Interference Test" begin
-using Gabs
-using Gabs: device
-using LinearAlgebra  
-using CUDA
-using Test
+@testitem "GPU Batched Interference Test" tags=[:cuda] begin
+    using Gabs
+    using Gabs: device
+    using LinearAlgebra  
+    using CUDA
+    using Test
 
-@testset "GPU Batched Interference Wigner Functions" begin
-    basis = QuadPairBasis(1)
-    α1, α2 = 1.0f0 + 0.5f0*im, -1.0f0 + 0.3f0*im
-    state1 = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, α1)
-    state2 = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, α2)
-    coeffs = Float32[0.6, 0.8]
-    lc = GaussianLinearCombination(basis, coeffs, [state1, state2])
-    @test device(lc) == :gpu
-    @test length(lc) == 2
-    
-    @testset "Batched Wigner Evaluation" begin
-        num_points = 100
-        x_points = CuArray(randn(Float32, 2, num_points))
-        w_batch = wigner(lc, x_points)
-        @test w_batch isa CuArray{Float32}
-        @test size(w_batch) == (num_points,)
-        @test device(w_batch) == :gpu
-        @test all(isfinite, Array(w_batch))
-        w_single = [wigner(lc, @view x_points[:, i]) for i in 1:min(10, num_points)]
-        w_batch_sample = Array(w_batch[1:length(w_single)])
-        @test w_batch_sample ≈ w_single rtol=1e-5
-    end
-    
-    @testset "Batched Wigner Characteristic Function" begin  
-        num_points = 50
-        xi_points = CuArray(randn(Float32, 2, num_points))
-        char_batch = wignerchar(lc, xi_points)
-        @test char_batch isa CuArray{ComplexF32}
-        @test size(char_batch) == (num_points,)
-        @test device(char_batch) == :gpu
-        @test all(isfinite, Array(real.(char_batch)))
-        @test all(isfinite, Array(imag.(char_batch)))
-        char_single = [wignerchar(lc, @view xi_points[:, i]) for i in 1:min(5, num_points)]
-        char_batch_sample = Array(char_batch[1:length(char_single)])
-        @test char_batch_sample ≈ char_single rtol=1e-5
-    end
-    
-    @testset "Automatic CPU->GPU Promotion" begin
-        num_points = 20
-        x_points_cpu = randn(Float32, 2, num_points)
-        xi_points_cpu = randn(Float32, 2, num_points)
-        w_auto = wigner(lc, x_points_cpu)
-        char_auto = wignerchar(lc, xi_points_cpu)
-        @test device(w_auto) == :gpu
-        @test device(char_auto) == :gpu
-        w_direct = wigner(lc, CuArray(x_points_cpu))
-        char_direct = wignerchar(lc, CuArray(xi_points_cpu))
-        @test Array(w_auto) ≈ Array(w_direct) rtol=1e-6
-        @test Array(char_auto) ≈ Array(char_direct) rtol=1e-6
-    end
-    
-    @testset "Performance Scaling" begin
-        large_num_points = 1000
-        x_large = CuArray(randn(Float32, 2, large_num_points))
-        @test_nowarn begin
-            w_large = wigner(lc, x_large)
-            @test length(w_large) == large_num_points
-            @test device(w_large) == :gpu
+    @testset "GPU Batched Interference Wigner Functions" begin
+        basis = QuadPairBasis(1)
+        α1, α2 = 1.0f0 + 0.5f0*im, -1.0f0 + 0.3f0*im
+        state1 = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, α1)
+        state2 = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, α2)
+        coeffs = Float32[0.6, 0.8]
+        lc = GaussianLinearCombination(basis, coeffs, [state1, state2])
+        @test device(lc) == :gpu
+        @test length(lc) == 2
+        
+        @testset "Batched Wigner Evaluation" begin
+            num_points = 100
+            x_points = CuArray(randn(Float32, 2, num_points))
+            w_batch = wigner(lc, x_points)
+            @test w_batch isa CuArray{Float32}
+            @test size(w_batch) == (num_points,)
+            @test device(w_batch) == :gpu
+            @test all(isfinite, Array(w_batch))
+            w_single = [wigner(lc, @view x_points[:, i]) for i in 1:min(10, num_points)]
+            w_batch_sample = Array(w_batch[1:length(w_single)])
+            @test w_batch_sample ≈ w_single rtol=1e-5
+        end
+        
+        @testset "Batched Wigner Characteristic Function" begin  
+            num_points = 50
+            xi_points = CuArray(randn(Float32, 2, num_points))
+            char_batch = wignerchar(lc, xi_points)
+            @test char_batch isa CuArray{ComplexF32}
+            @test size(char_batch) == (num_points,)
+            @test device(char_batch) == :gpu
+            @test all(isfinite, Array(real.(char_batch)))
+            @test all(isfinite, Array(imag.(char_batch)))
+            char_single = [wignerchar(lc, @view xi_points[:, i]) for i in 1:min(5, num_points)]
+            char_batch_sample = Array(char_batch[1:length(char_single)])
+            @test char_batch_sample ≈ char_single rtol=1e-5
+        end
+        
+        @testset "Automatic CPU->GPU Promotion" begin
+            num_points = 20
+            x_points_cpu = randn(Float32, 2, num_points)
+            xi_points_cpu = randn(Float32, 2, num_points)
+            w_auto = wigner(lc, x_points_cpu)
+            char_auto = wignerchar(lc, xi_points_cpu)
+            @test device(w_auto) == :gpu
+            @test device(char_auto) == :gpu
+            w_direct = wigner(lc, CuArray(x_points_cpu))
+            char_direct = wignerchar(lc, CuArray(xi_points_cpu))
+            @test Array(w_auto) ≈ Array(w_direct) rtol=1e-6
+            @test Array(char_auto) ≈ Array(char_direct) rtol=1e-6
+        end
+        
+        @testset "Performance Scaling" begin
+            large_num_points = 1000
+            x_large = CuArray(randn(Float32, 2, large_num_points))
+            @test_nowarn begin
+                w_large = wigner(lc, x_large)
+                @test length(w_large) == large_num_points
+                @test device(w_large) == :gpu
+            end
+        end
+        
+        @testset "Multi-State Interference" begin
+            state3 = squeezedstate(CuVector{Float32}, CuMatrix{Float32}, basis, 0.2f0, Float32(π/6))
+            coeffs_multi = Float32[0.5, 0.3, 0.2]
+            lc_multi = GaussianLinearCombination(basis, coeffs_multi, [state1, state2, state3])
+            num_points = 50
+            x_points = CuArray(randn(Float32, 2, num_points))
+            w_multi = wigner(lc_multi, x_points)
+            char_multi = wignerchar(lc_multi, x_points)
+            @test w_multi isa CuArray{Float32}
+            @test char_multi isa CuArray{ComplexF32}
+            @test size(w_multi) == (num_points,)
+            @test size(char_multi) == (num_points,)
+            @test all(isfinite, Array(w_multi))
+            @test all(isfinite, Array(real.(char_multi)))
+            @test all(isfinite, Array(imag.(char_multi)))
+        end
+        
+        @testset "Error Handling and Edge Cases" begin
+            x_wrong_dim = CuArray(randn(Float32, 3, 10))
+            @test_throws ArgumentError wigner(lc, x_wrong_dim)
+            @test_throws ArgumentError wignerchar(lc, x_wrong_dim)
+            @test_throws DimensionMismatch GaussianLinearCombination(basis, Float32[0.5, 0.3], [state1])
+            basis_wrong = QuadBlockBasis(1)
+            state_wrong = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis_wrong, 1.0f0)
+            @test_throws ArgumentError GaussianLinearCombination(basis, Float32[0.5], [state_wrong])
+            x_single = CuArray(randn(Float32, 2, 1))
+            w_single_batch = wigner(lc, x_single)
+            @test length(w_single_batch) == 1
+            @test isfinite(Array(w_single_batch)[1])
         end
     end
-    
-    @testset "Multi-State Interference" begin
-        state3 = squeezedstate(CuVector{Float32}, CuMatrix{Float32}, basis, 0.2f0, Float32(π/6))
-        coeffs_multi = Float32[0.5, 0.3, 0.2]
-        lc_multi = GaussianLinearCombination(basis, coeffs_multi, [state1, state2, state3])
-        num_points = 50
-        x_points = CuArray(randn(Float32, 2, num_points))
-        w_multi = wigner(lc_multi, x_points)
-        char_multi = wignerchar(lc_multi, x_points)
-        @test w_multi isa CuArray{Float32}
-        @test char_multi isa CuArray{ComplexF32}
-        @test size(w_multi) == (num_points,)
-        @test size(char_multi) == (num_points,)
-        @test all(isfinite, Array(w_multi))
-        @test all(isfinite, Array(real.(char_multi)))
-        @test all(isfinite, Array(imag.(char_multi)))
-    end
-    
-    @testset "Error Handling and Edge Cases" begin
-        x_wrong_dim = CuArray(randn(Float32, 3, 10))
-        @test_throws ArgumentError wigner(lc, x_wrong_dim)
-        @test_throws ArgumentError wignerchar(lc, x_wrong_dim)
-        @test_throws DimensionMismatch GaussianLinearCombination(basis, Float32[0.5, 0.3], [state1])
-        basis_wrong = QuadBlockBasis(1)
-        state_wrong = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis_wrong, 1.0f0)
-        @test_throws ArgumentError GaussianLinearCombination(basis, Float32[0.5], [state_wrong])
-        x_single = CuArray(randn(Float32, 2, 1))
-        w_single_batch = wigner(lc, x_single)
-        @test length(w_single_batch) == 1
-        @test isfinite(Array(w_single_batch)[1])
-    end
-end
 
-@testset "GPU Batched Interference - Float64 Precision" begin
-    basis = QuadPairBasis(1)
-    state1_f64 = coherentstate(CuVector{Float64}, CuMatrix{Float64}, basis, 1.0 + 0.5*im)
-    state2_f64 = coherentstate(CuVector{Float64}, CuMatrix{Float64}, basis, -1.0 + 0.3*im)
-    coeffs_f64 = [0.6, 0.8]
-    lc_f64 = GaussianLinearCombination(basis, coeffs_f64, [state1_f64, state2_f64])
-    x_points_f64 = CuArray(randn(Float64, 2, 20))
-    w_f64 = wigner(lc_f64, x_points_f64)
-    char_f64 = wignerchar(lc_f64, x_points_f64)
-    @test w_f64 isa CuArray{Float64}
-    @test char_f64 isa CuArray{ComplexF64}
-    @test all(isfinite, Array(w_f64))
-    @test all(isfinite, Array(real.(char_f64)))
-    @test all(isfinite, Array(imag.(char_f64)))
-end
+    @testset "GPU Batched Interference - Float64 Precision" begin
+        basis = QuadPairBasis(1)
+        state1_f64 = coherentstate(CuVector{Float64}, CuMatrix{Float64}, basis, 1.0 + 0.5*im)
+        state2_f64 = coherentstate(CuVector{Float64}, CuMatrix{Float64}, basis, -1.0 + 0.3*im)
+        coeffs_f64 = [0.6, 0.8]
+        lc_f64 = GaussianLinearCombination(basis, coeffs_f64, [state1_f64, state2_f64])
+        x_points_f64 = CuArray(randn(Float64, 2, 20))
+        w_f64 = wigner(lc_f64, x_points_f64)
+        char_f64 = wignerchar(lc_f64, x_points_f64)
+        @test w_f64 isa CuArray{Float64}
+        @test char_f64 isa CuArray{ComplexF64}
+        @test all(isfinite, Array(w_f64))
+        @test all(isfinite, Array(real.(char_f64)))
+        @test all(isfinite, Array(imag.(char_f64)))
+    end
 
-@testset "GPU Batched Interference - Multi-Mode" begin
-    basis_2mode = QuadPairBasis(2)
-    state1_2m = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis_2mode, 1.0f0)
-    state2_2m = squeezedstate(CuVector{Float32}, CuMatrix{Float32}, basis_2mode, 0.3f0, 0.0f0)
-    coeffs_2m = Float32[0.7, 0.3]
-    lc_2m = GaussianLinearCombination(basis_2mode, coeffs_2m, [state1_2m, state2_2m])
-    num_points = 30
-    x_points_2m = CuArray(randn(Float32, 4, num_points))
-    w_2m = wigner(lc_2m, x_points_2m)
-    char_2m = wignerchar(lc_2m, x_points_2m)
-    @test w_2m isa CuArray{Float32}
-    @test char_2m isa CuArray{ComplexF32}
-    @test size(w_2m) == (num_points,)
-    @test size(char_2m) == (num_points,)
-    @test all(isfinite, Array(w_2m))
-    @test all(isfinite, Array(real.(char_2m)))
-    @test all(isfinite, Array(imag.(char_2m)))
-end
+    @testset "GPU Batched Interference - Multi-Mode" begin
+        basis_2mode = QuadPairBasis(2)
+        state1_2m = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis_2mode, 1.0f0)
+        state2_2m = squeezedstate(CuVector{Float32}, CuMatrix{Float32}, basis_2mode, 0.3f0, 0.0f0)
+        coeffs_2m = Float32[0.7, 0.3]
+        lc_2m = GaussianLinearCombination(basis_2mode, coeffs_2m, [state1_2m, state2_2m])
+        num_points = 30
+        x_points_2m = CuArray(randn(Float32, 4, num_points))
+        w_2m = wigner(lc_2m, x_points_2m)
+        char_2m = wignerchar(lc_2m, x_points_2m)
+        @test w_2m isa CuArray{Float32}
+        @test char_2m isa CuArray{ComplexF32}
+        @test size(w_2m) == (num_points,)
+        @test size(char_2m) == (num_points,)
+        @test all(isfinite, Array(w_2m))
+        @test all(isfinite, Array(real.(char_2m)))
+        @test all(isfinite, Array(imag.(char_2m)))
+    end
 
 end
 
 #Benchmark code
 #=
-@testitem "GPU Performance Benchmarks for Wigner and Tensor" begin
+@testitem "GPU Performance Benchmarks for Wigner and Tensor" tags=[:cuda] begin
     using CUDA
     using Gabs
     using Gabs: device
@@ -2541,184 +2540,184 @@ end
 =#
 
 #=
-@testitem "GPU Batched Performance Benchmarks" begin
-using Gabs
-using Gabs: device
-using LinearAlgebra  
-using CUDA
-using Test
-using BenchmarkTools
+@testitem "GPU Batched Performance Benchmarks" tags=[:cuda] begin
+    using Gabs
+    using Gabs: device
+    using LinearAlgebra  
+    using CUDA
+    using Test
+    using BenchmarkTools
 
-function cpu_wigner_batch(lc, x_points)
-    results = Vector{Float32}(undef, size(x_points, 2))
-    for i in 1:size(x_points, 2)
-        results[i] = wigner(lc, x_points[:, i])
-    end
-    return results
-end
-
-function cpu_wignerchar_batch(lc, xi_points)
-    results = Vector{ComplexF32}(undef, size(xi_points, 2))
-    for i in 1:size(xi_points, 2)
-        results[i] = wignerchar(lc, xi_points[:, i])
-    end
-    return results
-end
-
-function cpu_lc_wigner_batch(lc, x_points)
-    results = Vector{Float32}(undef, size(x_points, 2))
-    for i in 1:size(x_points, 2)
-        results[i] = wigner(lc, x_points[:, i])
-    end
-    return results
-end
-
-@testset "GPU vs CPU Speedup Benchmarks - Batched Interference" begin
-    println("GPU BATCHED INTERFERENCE PERFORMANCE BENCHMARKS")
-    test_configs = [
-        (1, 100,    "Small: 1-mode, 2-state, 100 points"),
-        (1, 1_000,  "Medium: 1-mode, 2-state, 1K points"), 
-        (1, 10_000, "Large: 1-mode, 2-state, 10K points"),
-        (2, 1_000,  "Multi-mode: 2-mode, 2-state, 1K points"),
-        (1, 50_000, "Very Large: 1-mode, 2-state, 50K points"),
-        (3, 500,    "High-D: 3-mode, 2-state, 500 points"),
-    ]
-    @testset "Wigner Function Benchmarks" begin
-        println("\nWIGNER FUNCTION BENCHMARKS:")        
-        for (nmodes, npoints, description) in test_configs
-            println("\nTesting: $description")
-            basis = QuadPairBasis(nmodes)
-            phase_space_dim = 2 * nmodes
-            state1_cpu = coherentstate(basis, 1.0f0 + 0.5f0*im)
-            state2_cpu = coherentstate(basis, -1.0f0 + 0.3f0*im)
-            state1_gpu = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, 1.0f0 + 0.5f0*im)
-            state2_gpu = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, -1.0f0 + 0.3f0*im)
-            coeffs = Float32[0.6, 0.8]
-            coeffs ./= norm(coeffs)
-            cpu_states_array = [state1_cpu, state2_cpu]
-            gpu_states_array = [state1_gpu, state2_gpu]
-            cpu_lc = GaussianLinearCombination(basis, coeffs, cpu_states_array)
-            gpu_lc = GaussianLinearCombination(basis, coeffs, gpu_states_array)
-            @test device(gpu_lc) == :gpu
-            x_points_cpu = randn(Float32, phase_space_dim, npoints)
-            x_points_gpu = CuArray(x_points_cpu)
-            if npoints >= 100
-                wigner(cpu_lc, x_points_cpu[:, 1])
-                wigner(gpu_lc, x_points_gpu[:, 1:min(10, npoints)])
-                CUDA.synchronize()
-            end
-            print("   CPU: ")
-            cpu_time = @belapsed cpu_wigner_batch($cpu_lc, $x_points_cpu) samples=3 evals=1
-            cpu_result = cpu_wigner_batch(cpu_lc, x_points_cpu)
-            print("   GPU: ")
-            gpu_time = @belapsed begin
-                result = wigner($gpu_lc, $x_points_gpu)
-                CUDA.synchronize()
-                result
-            end samples=3 evals=1
-            gpu_result = wigner(gpu_lc, x_points_gpu)
-            CUDA.synchronize()
-            sample_size = min(20, npoints)
-            cpu_sample = cpu_result[1:sample_size]
-            gpu_sample = Array(gpu_result[1:sample_size])
-            @test cpu_sample ≈ gpu_sample rtol=1e-4
-            speedup = cpu_time / gpu_time
-            println("   Results:")
-            println("      CPU Time: $(round(cpu_time*1000, digits=2)) ms")
-            println("      GPU Time: $(round(gpu_time*1000, digits=2)) ms")
-            println("      Speedup:  $(round(speedup, digits=1))x")
+    function cpu_wigner_batch(lc, x_points)
+        results = Vector{Float32}(undef, size(x_points, 2))
+        for i in 1:size(x_points, 2)
+            results[i] = wigner(lc, x_points[:, i])
         end
+        return results
     end
-    
-    @testset "Wigner Characteristic Function Benchmarks" begin
-        println("\n\nWIGNER CHARACTERISTIC FUNCTION BENCHMARKS:")
-        char_configs = [
-            (1, 500,   "Small: 1-mode, 2-state, 500 points"),
-            (1, 5_000, "Medium: 1-mode, 2-state, 5K points"),
-            (2, 1_000, "Multi-mode: 2-mode, 2-state, 1K points"),
-            (1, 20_000,"Large: 1-mode, 2-state, 20K points"),
+
+    function cpu_wignerchar_batch(lc, xi_points)
+        results = Vector{ComplexF32}(undef, size(xi_points, 2))
+        for i in 1:size(xi_points, 2)
+            results[i] = wignerchar(lc, xi_points[:, i])
+        end
+        return results
+    end
+
+    function cpu_lc_wigner_batch(lc, x_points)
+        results = Vector{Float32}(undef, size(x_points, 2))
+        for i in 1:size(x_points, 2)
+            results[i] = wigner(lc, x_points[:, i])
+        end
+        return results
+    end
+
+    @testset "GPU vs CPU Speedup Benchmarks - Batched Interference" begin
+        println("GPU BATCHED INTERFERENCE PERFORMANCE BENCHMARKS")
+        test_configs = [
+            (1, 100,    "Small: 1-mode, 2-state, 100 points"),
+            (1, 1_000,  "Medium: 1-mode, 2-state, 1K points"), 
+            (1, 10_000, "Large: 1-mode, 2-state, 10K points"),
+            (2, 1_000,  "Multi-mode: 2-mode, 2-state, 1K points"),
+            (1, 50_000, "Very Large: 1-mode, 2-state, 50K points"),
+            (3, 500,    "High-D: 3-mode, 2-state, 500 points"),
         ]
+        @testset "Wigner Function Benchmarks" begin
+            println("\nWIGNER FUNCTION BENCHMARKS:")        
+            for (nmodes, npoints, description) in test_configs
+                println("\nTesting: $description")
+                basis = QuadPairBasis(nmodes)
+                phase_space_dim = 2 * nmodes
+                state1_cpu = coherentstate(basis, 1.0f0 + 0.5f0*im)
+                state2_cpu = coherentstate(basis, -1.0f0 + 0.3f0*im)
+                state1_gpu = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, 1.0f0 + 0.5f0*im)
+                state2_gpu = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, -1.0f0 + 0.3f0*im)
+                coeffs = Float32[0.6, 0.8]
+                coeffs ./= norm(coeffs)
+                cpu_states_array = [state1_cpu, state2_cpu]
+                gpu_states_array = [state1_gpu, state2_gpu]
+                cpu_lc = GaussianLinearCombination(basis, coeffs, cpu_states_array)
+                gpu_lc = GaussianLinearCombination(basis, coeffs, gpu_states_array)
+                @test device(gpu_lc) == :gpu
+                x_points_cpu = randn(Float32, phase_space_dim, npoints)
+                x_points_gpu = CuArray(x_points_cpu)
+                if npoints >= 100
+                    wigner(cpu_lc, x_points_cpu[:, 1])
+                    wigner(gpu_lc, x_points_gpu[:, 1:min(10, npoints)])
+                    CUDA.synchronize()
+                end
+                print("   CPU: ")
+                cpu_time = @belapsed cpu_wigner_batch($cpu_lc, $x_points_cpu) samples=3 evals=1
+                cpu_result = cpu_wigner_batch(cpu_lc, x_points_cpu)
+                print("   GPU: ")
+                gpu_time = @belapsed begin
+                    result = wigner($gpu_lc, $x_points_gpu)
+                    CUDA.synchronize()
+                    result
+                end samples=3 evals=1
+                gpu_result = wigner(gpu_lc, x_points_gpu)
+                CUDA.synchronize()
+                sample_size = min(20, npoints)
+                cpu_sample = cpu_result[1:sample_size]
+                gpu_sample = Array(gpu_result[1:sample_size])
+                @test cpu_sample ≈ gpu_sample rtol=1e-4
+                speedup = cpu_time / gpu_time
+                println("   Results:")
+                println("      CPU Time: $(round(cpu_time*1000, digits=2)) ms")
+                println("      GPU Time: $(round(gpu_time*1000, digits=2)) ms")
+                println("      Speedup:  $(round(speedup, digits=1))x")
+            end
+        end
         
-        for (nmodes, npoints, description) in char_configs
-            println("\nTesting: $description")
-            basis = QuadPairBasis(nmodes)
-            phase_space_dim = 2 * nmodes
+        @testset "Wigner Characteristic Function Benchmarks" begin
+            println("\n\nWIGNER CHARACTERISTIC FUNCTION BENCHMARKS:")
+            char_configs = [
+                (1, 500,   "Small: 1-mode, 2-state, 500 points"),
+                (1, 5_000, "Medium: 1-mode, 2-state, 5K points"),
+                (2, 1_000, "Multi-mode: 2-mode, 2-state, 1K points"),
+                (1, 20_000,"Large: 1-mode, 2-state, 20K points"),
+            ]
+            
+            for (nmodes, npoints, description) in char_configs
+                println("\nTesting: $description")
+                basis = QuadPairBasis(nmodes)
+                phase_space_dim = 2 * nmodes
+                state1_cpu = coherentstate(basis, 1.0f0 + 0.5f0*im)
+                state2_cpu = coherentstate(basis, -1.0f0 + 0.3f0*im)
+                state1_gpu = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, 1.0f0 + 0.5f0*im)
+                state2_gpu = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, -1.0f0 + 0.3f0*im)
+                coeffs = Float32[0.6, 0.8]
+                coeffs ./= norm(coeffs)
+                cpu_states_array = [state1_cpu, state2_cpu]
+                gpu_states_array = [state1_gpu, state2_gpu]
+                cpu_lc = GaussianLinearCombination(basis, coeffs, cpu_states_array)
+                gpu_lc = GaussianLinearCombination(basis, coeffs, gpu_states_array)
+                xi_points_cpu = randn(Float32, phase_space_dim, npoints)
+                xi_points_gpu = CuArray(xi_points_cpu)
+                if npoints >= 100
+                    wignerchar(cpu_lc, xi_points_cpu[:, 1])
+                    wignerchar(gpu_lc, xi_points_gpu[:, 1:min(5, npoints)])
+                    CUDA.synchronize()
+                end
+                print("   CPU: ")
+                cpu_time = @belapsed cpu_wignerchar_batch($cpu_lc, $xi_points_cpu) samples=3 evals=1
+                cpu_result = cpu_wignerchar_batch(cpu_lc, xi_points_cpu)
+                print("   GPU: ")
+                gpu_time = @belapsed begin
+                    result = wignerchar($gpu_lc, $xi_points_gpu)
+                    CUDA.synchronize()
+                    result
+                end samples=3 evals=1
+                gpu_result = wignerchar(gpu_lc, xi_points_gpu)
+                CUDA.synchronize()
+                sample_size = min(10, npoints)
+                cpu_sample = cpu_result[1:sample_size]
+                gpu_sample = Array(gpu_result[1:sample_size])
+                @test cpu_sample ≈ gpu_sample rtol=1e-4
+                speedup = cpu_time / gpu_time
+                println("   Results:")
+                println("      CPU Time: $(round(cpu_time*1000, digits=2)) ms")
+                println("      GPU Time: $(round(gpu_time*1000, digits=2)) ms")
+                println("      Speedup:  $(round(speedup, digits=1))x")
+            end
+        end
+        
+        @testset "Cross-Wigner Batch Performance" begin
+            println("\n\nCROSS-WIGNER BATCH PERFORMANCE:")
+            basis = QuadPairBasis(1)
             state1_cpu = coherentstate(basis, 1.0f0 + 0.5f0*im)
-            state2_cpu = coherentstate(basis, -1.0f0 + 0.3f0*im)
+            state2_cpu = squeezedstate(basis, 0.3f0, Float32(π/4))
             state1_gpu = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, 1.0f0 + 0.5f0*im)
-            state2_gpu = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, -1.0f0 + 0.3f0*im)
-            coeffs = Float32[0.6, 0.8]
-            coeffs ./= norm(coeffs)
-            cpu_states_array = [state1_cpu, state2_cpu]
-            gpu_states_array = [state1_gpu, state2_gpu]
-            cpu_lc = GaussianLinearCombination(basis, coeffs, cpu_states_array)
-            gpu_lc = GaussianLinearCombination(basis, coeffs, gpu_states_array)
-            xi_points_cpu = randn(Float32, phase_space_dim, npoints)
-            xi_points_gpu = CuArray(xi_points_cpu)
-            if npoints >= 100
-                wignerchar(cpu_lc, xi_points_cpu[:, 1])
-                wignerchar(gpu_lc, xi_points_gpu[:, 1:min(5, npoints)])
-                CUDA.synchronize()
+            state2_gpu = squeezedstate(CuVector{Float32}, CuMatrix{Float32}, basis, 0.3f0, Float32(π/4))
+            batch_sizes = [100, 1_000, 10_000, 50_000]
+            
+            for npoints in batch_sizes
+                println("\nCross-Wigner batch size: $npoints points")
+                x_points_cpu = randn(Float32, 2, npoints)
+                x_points_gpu = CuArray(x_points_cpu)
+                if npoints >= 100
+                    Gabs.cross_wigner(state1_cpu, state2_cpu, x_points_cpu[:, 1])
+                end
+                coeffs = Float32[0.7, 0.3]
+                cpu_states_array = [state1_cpu, state2_cpu]
+                gpu_states_array = [state1_gpu, state2_gpu]
+                cpu_lc = GaussianLinearCombination(basis, coeffs, cpu_states_array)
+                gpu_lc = GaussianLinearCombination(basis, coeffs, gpu_states_array)
+                print("   CPU: ")
+                cpu_time = @belapsed cpu_lc_wigner_batch($cpu_lc, $x_points_cpu) samples=2 evals=1
+                print("   GPU: ")
+                gpu_time = @belapsed begin
+                    result = wigner($gpu_lc, $x_points_gpu)
+                    CUDA.synchronize()
+                    result
+                end samples=2 evals=1
+                speedup = cpu_time / gpu_time
+                println("   Results:")
+                println("      CPU Time: $(round(cpu_time*1000, digits=2)) ms")
+                println("      GPU Time: $(round(gpu_time*1000, digits=2)) ms") 
+                println("      Speedup:  $(round(speedup, digits=1))x")
             end
-            print("   CPU: ")
-            cpu_time = @belapsed cpu_wignerchar_batch($cpu_lc, $xi_points_cpu) samples=3 evals=1
-            cpu_result = cpu_wignerchar_batch(cpu_lc, xi_points_cpu)
-            print("   GPU: ")
-            gpu_time = @belapsed begin
-                result = wignerchar($gpu_lc, $xi_points_gpu)
-                CUDA.synchronize()
-                result
-            end samples=3 evals=1
-            gpu_result = wignerchar(gpu_lc, xi_points_gpu)
-            CUDA.synchronize()
-            sample_size = min(10, npoints)
-            cpu_sample = cpu_result[1:sample_size]
-            gpu_sample = Array(gpu_result[1:sample_size])
-            @test cpu_sample ≈ gpu_sample rtol=1e-4
-            speedup = cpu_time / gpu_time
-            println("   Results:")
-            println("      CPU Time: $(round(cpu_time*1000, digits=2)) ms")
-            println("      GPU Time: $(round(gpu_time*1000, digits=2)) ms")
-            println("      Speedup:  $(round(speedup, digits=1))x")
         end
     end
-    
-    @testset "Cross-Wigner Batch Performance" begin
-        println("\n\nCROSS-WIGNER BATCH PERFORMANCE:")
-        basis = QuadPairBasis(1)
-        state1_cpu = coherentstate(basis, 1.0f0 + 0.5f0*im)
-        state2_cpu = squeezedstate(basis, 0.3f0, Float32(π/4))
-        state1_gpu = coherentstate(CuVector{Float32}, CuMatrix{Float32}, basis, 1.0f0 + 0.5f0*im)
-        state2_gpu = squeezedstate(CuVector{Float32}, CuMatrix{Float32}, basis, 0.3f0, Float32(π/4))
-        batch_sizes = [100, 1_000, 10_000, 50_000]
-        
-        for npoints in batch_sizes
-            println("\nCross-Wigner batch size: $npoints points")
-            x_points_cpu = randn(Float32, 2, npoints)
-            x_points_gpu = CuArray(x_points_cpu)
-            if npoints >= 100
-                Gabs.cross_wigner(state1_cpu, state2_cpu, x_points_cpu[:, 1])
-            end
-            coeffs = Float32[0.7, 0.3]
-            cpu_states_array = [state1_cpu, state2_cpu]
-            gpu_states_array = [state1_gpu, state2_gpu]
-            cpu_lc = GaussianLinearCombination(basis, coeffs, cpu_states_array)
-            gpu_lc = GaussianLinearCombination(basis, coeffs, gpu_states_array)
-            print("   CPU: ")
-            cpu_time = @belapsed cpu_lc_wigner_batch($cpu_lc, $x_points_cpu) samples=2 evals=1
-            print("   GPU: ")
-            gpu_time = @belapsed begin
-                result = wigner($gpu_lc, $x_points_gpu)
-                CUDA.synchronize()
-                result
-            end samples=2 evals=1
-            speedup = cpu_time / gpu_time
-            println("   Results:")
-            println("      CPU Time: $(round(cpu_time*1000, digits=2)) ms")
-            println("      GPU Time: $(round(gpu_time*1000, digits=2)) ms") 
-            println("      Speedup:  $(round(speedup, digits=1))x")
-        end
-    end
-end
 end
 =#
