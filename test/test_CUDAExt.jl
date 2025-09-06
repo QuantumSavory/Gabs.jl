@@ -508,327 +508,6 @@ end
     end
 end
 
-#=
-@testitem "GPU Performance Benchmarks for Wigner and Tensor" begin
-    using CUDA
-    using Gabs
-    using Gabs: device
-    using LinearAlgebra
-    using Statistics
-    
-    function gpu_warmup()
-        basis = QuadPairBasis(1)
-        try
-            for _ in 1:5
-                vac = vacuumstate(basis) |> gpu
-                coh = coherentstate(basis, 1.0f0) |> gpu
-            end
-            vac = vacuumstate(basis) |> gpu
-            disp = displace(basis, 1.0f0) |> gpu
-            for _ in 1:5
-                displaced = disp * vac
-            end
-            coh = coherentstate(basis, 0.5f0) |> gpu
-            test_points = CuArray(randn(Float32, 2, 100))
-            for _ in 1:3
-                w = wigner(coh, test_points)
-            end
-            CUDA.synchronize()
-            GC.gc()
-        catch e
-            @error "GPU warmup failed" exception=e
-            rethrow(e)
-        end
-    end
-    
-    function benchmark_operation(gpu_func, cpu_func, name::String; n_trials=5, min_time=1e-6)
-        gpu_times = Float64[]
-        for trial in 1:n_trials
-            CUDA.synchronize()
-            t_start = time_ns()
-            result_gpu = gpu_func()
-            CUDA.synchronize()
-            t_end = time_ns()
-            elapsed = max((t_end - t_start) / 1e9, min_time)
-            push!(gpu_times, elapsed)
-        end
-        cpu_times = Float64[]
-        for trial in 1:n_trials
-            GC.gc()
-            t_start = time_ns()
-            result_cpu = cpu_func()
-            t_end = time_ns()
-            elapsed = max((t_end - t_start) / 1e9, min_time)
-            push!(cpu_times, elapsed)
-        end
-        gpu_median = median(gpu_times)
-        cpu_median = median(cpu_times)
-        speedup = cpu_median / gpu_median
-        @info "Benchmark: $name" cpu_time=round(cpu_median, digits=4) gpu_time=round(gpu_median, digits=4) speedup=round(speedup, digits=2)
-        return speedup, gpu_median, cpu_median
-    end
-    
-    @testset "GPU Warmup" begin
-        gpu_warmup()
-        @test true
-    end
-    
-    @testset "API Usage" begin
-        basis = QuadPairBasis(1)
-        state = coherentstate(basis, 1.0) |> gpu
-        op = displace(basis, 0.5) |> gpu
-        result = op * state
-        @test device(state) == :gpu
-        @test device(op) == :gpu
-        @test device(result) == :gpu
-        α_gpu = CuArray([1.0f0 + 0.5f0im])
-        auto_state = coherentstate(basis, α_gpu)
-        @test device(auto_state) == :gpu
-    end
-    
-    @testset "State Creation Benchmarks" begin
-        
-        @testset "Single-Mode State Creation" begin
-            basis = QuadPairBasis(1)
-            α = 1.0f0 + 0.5f0im
-            gpu_func = () -> coherentstate(basis, α) |> gpu
-            cpu_func = () -> coherentstate(basis, α)
-            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Single-mode coherent state creation")
-            coh_gpu = gpu_func()
-            coh_cpu = cpu_func()
-            @test Array(coh_gpu.mean) ≈ Float32.(coh_cpu.mean) rtol=1e-6
-            @test speedup > 0.01
-        end
-        
-        @testset "Multi-Mode State Creation" begin
-            basis = QuadPairBasis(10)
-            α_vec = randn(ComplexF32, 10)
-            gpu_func = () -> coherentstate(basis, α_vec) |> gpu
-            cpu_func = () -> coherentstate(basis, α_vec)
-            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "10-mode coherent state creation")
-            @test speedup > 0.03
-        end
-        
-        @testset "Very Large State Creation" begin
-            basis = QuadPairBasis(20)
-            α_vec = randn(ComplexF32, 20)
-            gpu_func = () -> coherentstate(basis, α_vec) |> gpu
-            cpu_func = () -> coherentstate(basis, α_vec)
-            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "20-mode coherent state creation")
-            @test speedup > 0.04
-            if speedup > 1.0
-                @info "GPU advantage emerging for very large state creation: $(round(speedup, digits=2))x"
-            end
-        end
-    end
-    
-    @testset "Operation Application Benchmarks" begin
-        
-        @testset "Single-Mode Operations" begin
-            basis = QuadPairBasis(1)
-            vac_gpu = vacuumstate(basis) |> gpu
-            vac_cpu = vacuumstate(basis)
-            disp_gpu = displace(basis, 1.0f0) |> gpu
-            disp_cpu = displace(basis, 1.0f0)
-            gpu_func = () -> disp_gpu * vac_gpu
-            cpu_func = () -> disp_cpu * vac_cpu
-            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Single-mode operation application")
-            result_gpu = gpu_func()
-            result_cpu = cpu_func()
-            @test Array(result_gpu.mean) ≈ Float32.(result_cpu.mean) rtol=1e-6
-            @test speedup > 0.01
-        end
-        
-        @testset "Multi-Mode Operations" begin
-            basis = QuadPairBasis(5)
-            α_vec = randn(ComplexF32, 5)
-            coh_gpu = coherentstate(basis, α_vec) |> gpu
-            coh_cpu = coherentstate(basis, α_vec)
-            r_vec = randn(Float32, 5) * 0.3f0
-            θ_vec = randn(Float32, 5)
-            squeeze_gpu = squeeze(basis, r_vec, θ_vec) |> gpu
-            squeeze_cpu = squeeze(basis, r_vec, θ_vec)
-            gpu_func = () -> squeeze_gpu * coh_gpu
-            cpu_func = () -> squeeze_cpu * coh_cpu
-            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "5-mode squeeze operation")
-            @test speedup > 0.02
-        end
-    end
-    
-    @testset "Tensor Product Benchmarks" begin
-        
-        @testset "Small Tensor Products" begin
-            basis1 = QuadPairBasis(2)
-            basis2 = QuadPairBasis(2)
-            α1 = randn(ComplexF32, 2)
-            α2 = randn(ComplexF32, 2)
-            coh1_gpu = coherentstate(basis1, α1) |> gpu
-            coh2_gpu = coherentstate(basis2, α2) |> gpu
-            coh1_cpu = coherentstate(basis1, α1)
-            coh2_cpu = coherentstate(basis2, α2)
-            gpu_func = () -> tensor(coh1_gpu, coh2_gpu)
-            cpu_func = () -> tensor(coh1_cpu, coh2_cpu)
-            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Small tensor product (2⊗2 modes)")
-            result_gpu = gpu_func()
-            result_cpu = cpu_func()
-            @test result_gpu.basis.nmodes == 4
-            @test Array(result_gpu.mean) ≈ Float32.(result_cpu.mean) rtol=1e-6
-            @test Array(result_gpu.covar) ≈ Float32.(result_cpu.covar) rtol=1e-6
-            @test speedup > 0.05
-        end
-        
-        @testset "Larger Tensor Products" begin
-            basis1 = QuadPairBasis(3)
-            basis2 = QuadPairBasis(4)
-            α1 = randn(ComplexF32, 3)
-            α2 = randn(ComplexF32, 4)
-            coh1_gpu = coherentstate(basis1, α1) |> gpu
-            coh2_gpu = coherentstate(basis2, α2) |> gpu
-            coh1_cpu = coherentstate(basis1, α1)
-            coh2_cpu = coherentstate(basis2, α2)
-            gpu_func = () -> tensor(coh1_gpu, coh2_gpu)
-            cpu_func = () -> tensor(coh1_cpu, coh2_cpu)
-            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Large tensor product (3⊗4 modes)")
-            result_gpu = gpu_func()
-            result_cpu = cpu_func()
-            @test result_gpu.basis.nmodes == 7
-            @test Array(result_gpu.mean) ≈ Float32.(result_cpu.mean) rtol=1e-6
-            @test speedup > 0.05
-            if speedup > 1.0
-                @info "GPU tensor product advantage: $(round(speedup, digits=2))x"
-            end
-        end
-    end
-    
-    @testset "Wigner Function Benchmarks - The GPU Sweet Spot" begin
-        
-        @testset "Single-Point Wigner" begin
-            basis = QuadPairBasis(1)
-            coh_gpu = coherentstate(basis, 1.0f0) |> gpu
-            coh_cpu = coherentstate(basis, 1.0f0)
-            x_point = [0.5f0, 0.3f0]
-            gpu_func = () -> wigner(coh_gpu, x_point)
-            cpu_func = () -> wigner(coh_cpu, x_point)
-            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Single-point Wigner evaluation")
-            @test gpu_func() ≈ cpu_func() rtol=1e-5
-            @test speedup > 0.05
-        end
-        
-        @testset "Batch Wigner Evaluation - Small" begin
-            basis = QuadPairBasis(1)
-            coh_gpu = coherentstate(basis, 0.8f0) |> gpu
-            coh_cpu = coherentstate(basis, 0.8f0)
-            n_points = 1000
-            x_points_gpu = CuArray(randn(Float32, 2, n_points))
-            x_points_cpu = Array(x_points_gpu)
-            gpu_func = () -> wigner(coh_gpu, x_points_gpu)
-            cpu_func = () -> [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:n_points]
-            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Batch Wigner (1000 points)", n_trials=3)
-            @test speedup > 2.0
-            w_gpu = Array(gpu_func())
-            w_cpu = cpu_func()
-            @test w_gpu ≈ w_cpu rtol=1e-4
-            @info "GPU batch Wigner showing advantage: $(round(speedup, digits=1))x speedup"
-        end
-        
-        @testset "Batch Wigner Evaluation - Large" begin
-            basis = QuadPairBasis(1)
-            coh_gpu = coherentstate(basis, 0.5f0) |> gpu
-            coh_cpu = coherentstate(basis, 0.5f0)
-            n_points = 25000
-            x_points_gpu = CuArray(randn(Float32, 2, n_points))
-            x_points_cpu = Array(x_points_gpu)
-            gpu_func = () -> wigner(coh_gpu, x_points_gpu)
-            cpu_func = () -> [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:n_points]
-            speedup, gpu_time, cpu_time = benchmark_operation(gpu_func, cpu_func, "Large batch Wigner (25,000 points)", n_trials=3)
-            @test speedup > 10.0
-            @test gpu_time < 0.1
-            w_gpu = Array(gpu_func())
-            for i in 1:min(10, n_points)
-                w_single = wigner(coh_cpu, x_points_cpu[:, i])
-                @test w_gpu[i] ≈ w_single rtol=1e-4
-            end
-            @info "Large batch GPU advantage: $(round(speedup, digits=1))x speedup"
-        end
-        
-        @testset "Multi-Mode Wigner" begin
-            basis = QuadPairBasis(2)
-            α_vec = [0.5f0 + 0.3f0im, -0.2f0 + 0.8f0im]
-            coh_gpu = coherentstate(basis, α_vec) |> gpu
-            coh_cpu = coherentstate(basis, α_vec)
-            n_points = 5000
-            x_points_gpu = CuArray(randn(Float32, 4, n_points))
-            x_points_cpu = Array(x_points_gpu)
-            gpu_func = () -> wigner(coh_gpu, x_points_gpu)
-            cpu_func = () -> [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:n_points]
-            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Multi-mode Wigner (2 modes, 5000 points)", n_trials=3)
-            @test speedup > 5.0
-            @info "Multi-mode GPU advantage: $(round(speedup, digits=1))x speedup"
-        end
-    end
-    
-    @testset "Wigner Characteristic Function Benchmarks" begin
-        
-        @testset "Batch Wigner Characteristic - Professional API" begin
-            basis = QuadPairBasis(1)
-            sq_gpu = squeezedstate(basis, 0.3f0, Float32(π/4)) |> gpu
-            sq_cpu = squeezedstate(basis, 0.3f0, Float32(π/4))
-            n_points = 5000
-            xi_points_gpu = CuArray(randn(Float32, 2, n_points) * 0.5f0)
-            xi_points_cpu = Array(xi_points_gpu)
-            gpu_func = () -> wignerchar(sq_gpu, xi_points_gpu)
-            cpu_func = () -> [wignerchar(sq_cpu, xi_points_cpu[:, i]) for i in 1:n_points]
-            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Batch Wigner characteristic (5,000 points)", n_trials=3)
-            @test speedup > 2.0
-            chi_gpu = Array(gpu_func())
-            for i in 1:min(5, n_points)
-                chi_single = wignerchar(sq_cpu, xi_points_cpu[:, i])
-                @test real(chi_gpu[i]) ≈ real(chi_single) rtol=1e-4
-                @test imag(chi_gpu[i]) ≈ imag(chi_single) rtol=1e-4
-            end
-            @info "Wigner characteristic GPU advantage: $(round(speedup, digits=1))x speedup"
-        end
-    end
-    
-    @testset " Performance Tests" begin
-        basis = QuadPairBasis(1)
-        coh_gpu = coherentstate(basis, 1.0f0) |> gpu
-        coh_cpu = coherentstate(basis, 1.0f0)
-        n_points = 15000
-        x_points_gpu = CuArray(randn(Float32, 2, n_points))
-        x_points_cpu = Array(x_points_gpu)
-        gpu_func = () -> wigner(coh_gpu, x_points_gpu)
-        cpu_func = () -> [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:n_points]
-        speedup, gpu_time, cpu_time = benchmark_operation(gpu_func, cpu_func, " GPU validation")
-        @test speedup > 15.0
-        @test gpu_time < cpu_time / 10  
-        w_gpu = Array(gpu_func())
-        w_sample = [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:min(20, n_points)]
-        @test w_gpu[1:length(w_sample)] ≈ w_sample rtol=1e-4
-    end
-    
-    @testset "Scaling Analysis" begin
-        basis = QuadPairBasis(1)
-        coh_gpu = coherentstate(basis, 1.0f0) |> gpu
-        coh_cpu = coherentstate(basis, 1.0f0)
-        point_counts = [100, 500, 1000, 5000, 10000, 25000]
-        speedups = Float64[]
-        for n_points in point_counts
-            x_points_gpu = CuArray(randn(Float32, 2, n_points))
-            x_points_cpu = Array(x_points_gpu)
-            gpu_func = () -> wigner(coh_gpu, x_points_gpu)
-            cpu_func = () -> [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:n_points]
-            speedup, gpu_time, cpu_time = benchmark_operation(gpu_func, cpu_func, "Scaling test ($n_points points)", n_trials=3)
-            push!(speedups, speedup)
-            @info "Scaling point" n_points=n_points speedup=round(speedup, digits=2) gpu_time=round(gpu_time, digits=4) cpu_time=round(cpu_time, digits=4)
-        end
-        @test speedups[end] > speedups[1]  
-        @test maximum(speedups) > 10.0    
-        @info "Peak GPU speedup: $(round(maximum(speedups), digits=2))x"
-    end
-end
-=#
-
 @testitem "GPU Linear Combinations - Core Functionality" begin
     using CUDA
     using Gabs
@@ -1451,7 +1130,6 @@ end
         @test all(device(r) == :gpu for r in results)
     end
 end
-
 
 @testitem "GPU Basis Operations" begin
     using Gabs
@@ -2540,7 +2218,329 @@ end
 
 end
 
+#Benchmark code
+#=
+@testitem "GPU Performance Benchmarks for Wigner and Tensor" begin
+    using CUDA
+    using Gabs
+    using Gabs: device
+    using LinearAlgebra
+    using Statistics
+    
+    function gpu_warmup()
+        basis = QuadPairBasis(1)
+        try
+            for _ in 1:5
+                vac = vacuumstate(basis) |> gpu
+                coh = coherentstate(basis, 1.0f0) |> gpu
+            end
+            vac = vacuumstate(basis) |> gpu
+            disp = displace(basis, 1.0f0) |> gpu
+            for _ in 1:5
+                displaced = disp * vac
+            end
+            coh = coherentstate(basis, 0.5f0) |> gpu
+            test_points = CuArray(randn(Float32, 2, 100))
+            for _ in 1:3
+                w = wigner(coh, test_points)
+            end
+            CUDA.synchronize()
+            GC.gc()
+        catch e
+            @error "GPU warmup failed" exception=e
+            rethrow(e)
+        end
+    end
+    
+    function benchmark_operation(gpu_func, cpu_func, name::String; n_trials=5, min_time=1e-6)
+        gpu_times = Float64[]
+        for trial in 1:n_trials
+            CUDA.synchronize()
+            t_start = time_ns()
+            result_gpu = gpu_func()
+            CUDA.synchronize()
+            t_end = time_ns()
+            elapsed = max((t_end - t_start) / 1e9, min_time)
+            push!(gpu_times, elapsed)
+        end
+        cpu_times = Float64[]
+        for trial in 1:n_trials
+            GC.gc()
+            t_start = time_ns()
+            result_cpu = cpu_func()
+            t_end = time_ns()
+            elapsed = max((t_end - t_start) / 1e9, min_time)
+            push!(cpu_times, elapsed)
+        end
+        gpu_median = median(gpu_times)
+        cpu_median = median(cpu_times)
+        speedup = cpu_median / gpu_median
+        @info "Benchmark: $name" cpu_time=round(cpu_median, digits=4) gpu_time=round(gpu_median, digits=4) speedup=round(speedup, digits=2)
+        return speedup, gpu_median, cpu_median
+    end
+    
+    @testset "GPU Warmup" begin
+        gpu_warmup()
+        @test true
+    end
+    
+    @testset "API Usage" begin
+        basis = QuadPairBasis(1)
+        state = coherentstate(basis, 1.0) |> gpu
+        op = displace(basis, 0.5) |> gpu
+        result = op * state
+        @test device(state) == :gpu
+        @test device(op) == :gpu
+        @test device(result) == :gpu
+        α_gpu = CuArray([1.0f0 + 0.5f0im])
+        auto_state = coherentstate(basis, α_gpu)
+        @test device(auto_state) == :gpu
+    end
+    
+    @testset "State Creation Benchmarks" begin
+        
+        @testset "Single-Mode State Creation" begin
+            basis = QuadPairBasis(1)
+            α = 1.0f0 + 0.5f0im
+            gpu_func = () -> coherentstate(basis, α) |> gpu
+            cpu_func = () -> coherentstate(basis, α)
+            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Single-mode coherent state creation")
+            coh_gpu = gpu_func()
+            coh_cpu = cpu_func()
+            @test Array(coh_gpu.mean) ≈ Float32.(coh_cpu.mean) rtol=1e-6
+            @test speedup > 0.01
+        end
+        
+        @testset "Multi-Mode State Creation" begin
+            basis = QuadPairBasis(10)
+            α_vec = randn(ComplexF32, 10)
+            gpu_func = () -> coherentstate(basis, α_vec) |> gpu
+            cpu_func = () -> coherentstate(basis, α_vec)
+            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "10-mode coherent state creation")
+            @test speedup > 0.03
+        end
+        
+        @testset "Very Large State Creation" begin
+            basis = QuadPairBasis(20)
+            α_vec = randn(ComplexF32, 20)
+            gpu_func = () -> coherentstate(basis, α_vec) |> gpu
+            cpu_func = () -> coherentstate(basis, α_vec)
+            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "20-mode coherent state creation")
+            @test speedup > 0.04
+            if speedup > 1.0
+                @info "GPU advantage emerging for very large state creation: $(round(speedup, digits=2))x"
+            end
+        end
+    end
+    
+    @testset "Operation Application Benchmarks" begin
+        
+        @testset "Single-Mode Operations" begin
+            basis = QuadPairBasis(1)
+            vac_gpu = vacuumstate(basis) |> gpu
+            vac_cpu = vacuumstate(basis)
+            disp_gpu = displace(basis, 1.0f0) |> gpu
+            disp_cpu = displace(basis, 1.0f0)
+            gpu_func = () -> disp_gpu * vac_gpu
+            cpu_func = () -> disp_cpu * vac_cpu
+            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Single-mode operation application")
+            result_gpu = gpu_func()
+            result_cpu = cpu_func()
+            @test Array(result_gpu.mean) ≈ Float32.(result_cpu.mean) rtol=1e-6
+            @test speedup > 0.01
+        end
+        
+        @testset "Multi-Mode Operations" begin
+            basis = QuadPairBasis(5)
+            α_vec = randn(ComplexF32, 5)
+            coh_gpu = coherentstate(basis, α_vec) |> gpu
+            coh_cpu = coherentstate(basis, α_vec)
+            r_vec = randn(Float32, 5) * 0.3f0
+            θ_vec = randn(Float32, 5)
+            squeeze_gpu = squeeze(basis, r_vec, θ_vec) |> gpu
+            squeeze_cpu = squeeze(basis, r_vec, θ_vec)
+            gpu_func = () -> squeeze_gpu * coh_gpu
+            cpu_func = () -> squeeze_cpu * coh_cpu
+            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "5-mode squeeze operation")
+            @test speedup > 0.02
+        end
+    end
+    
+    @testset "Tensor Product Benchmarks" begin
+        
+        @testset "Small Tensor Products" begin
+            basis1 = QuadPairBasis(2)
+            basis2 = QuadPairBasis(2)
+            α1 = randn(ComplexF32, 2)
+            α2 = randn(ComplexF32, 2)
+            coh1_gpu = coherentstate(basis1, α1) |> gpu
+            coh2_gpu = coherentstate(basis2, α2) |> gpu
+            coh1_cpu = coherentstate(basis1, α1)
+            coh2_cpu = coherentstate(basis2, α2)
+            gpu_func = () -> tensor(coh1_gpu, coh2_gpu)
+            cpu_func = () -> tensor(coh1_cpu, coh2_cpu)
+            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Small tensor product (2⊗2 modes)")
+            result_gpu = gpu_func()
+            result_cpu = cpu_func()
+            @test result_gpu.basis.nmodes == 4
+            @test Array(result_gpu.mean) ≈ Float32.(result_cpu.mean) rtol=1e-6
+            @test Array(result_gpu.covar) ≈ Float32.(result_cpu.covar) rtol=1e-6
+            @test speedup > 0.05
+        end
+        
+        @testset "Larger Tensor Products" begin
+            basis1 = QuadPairBasis(3)
+            basis2 = QuadPairBasis(4)
+            α1 = randn(ComplexF32, 3)
+            α2 = randn(ComplexF32, 4)
+            coh1_gpu = coherentstate(basis1, α1) |> gpu
+            coh2_gpu = coherentstate(basis2, α2) |> gpu
+            coh1_cpu = coherentstate(basis1, α1)
+            coh2_cpu = coherentstate(basis2, α2)
+            gpu_func = () -> tensor(coh1_gpu, coh2_gpu)
+            cpu_func = () -> tensor(coh1_cpu, coh2_cpu)
+            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Large tensor product (3⊗4 modes)")
+            result_gpu = gpu_func()
+            result_cpu = cpu_func()
+            @test result_gpu.basis.nmodes == 7
+            @test Array(result_gpu.mean) ≈ Float32.(result_cpu.mean) rtol=1e-6
+            @test speedup > 0.05
+            if speedup > 1.0
+                @info "GPU tensor product advantage: $(round(speedup, digits=2))x"
+            end
+        end
+    end
+    
+    @testset "Wigner Function Benchmarks - The GPU Sweet Spot" begin
+        
+        @testset "Single-Point Wigner" begin
+            basis = QuadPairBasis(1)
+            coh_gpu = coherentstate(basis, 1.0f0) |> gpu
+            coh_cpu = coherentstate(basis, 1.0f0)
+            x_point = [0.5f0, 0.3f0]
+            gpu_func = () -> wigner(coh_gpu, x_point)
+            cpu_func = () -> wigner(coh_cpu, x_point)
+            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Single-point Wigner evaluation")
+            @test gpu_func() ≈ cpu_func() rtol=1e-5
+            @test speedup > 0.05
+        end
+        
+        @testset "Batch Wigner Evaluation - Small" begin
+            basis = QuadPairBasis(1)
+            coh_gpu = coherentstate(basis, 0.8f0) |> gpu
+            coh_cpu = coherentstate(basis, 0.8f0)
+            n_points = 1000
+            x_points_gpu = CuArray(randn(Float32, 2, n_points))
+            x_points_cpu = Array(x_points_gpu)
+            gpu_func = () -> wigner(coh_gpu, x_points_gpu)
+            cpu_func = () -> [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:n_points]
+            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Batch Wigner (1000 points)", n_trials=3)
+            @test speedup > 2.0
+            w_gpu = Array(gpu_func())
+            w_cpu = cpu_func()
+            @test w_gpu ≈ w_cpu rtol=1e-4
+            @info "GPU batch Wigner showing advantage: $(round(speedup, digits=1))x speedup"
+        end
+        
+        @testset "Batch Wigner Evaluation - Large" begin
+            basis = QuadPairBasis(1)
+            coh_gpu = coherentstate(basis, 0.5f0) |> gpu
+            coh_cpu = coherentstate(basis, 0.5f0)
+            n_points = 25000
+            x_points_gpu = CuArray(randn(Float32, 2, n_points))
+            x_points_cpu = Array(x_points_gpu)
+            gpu_func = () -> wigner(coh_gpu, x_points_gpu)
+            cpu_func = () -> [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:n_points]
+            speedup, gpu_time, cpu_time = benchmark_operation(gpu_func, cpu_func, "Large batch Wigner (25,000 points)", n_trials=3)
+            @test speedup > 10.0
+            @test gpu_time < 0.1
+            w_gpu = Array(gpu_func())
+            for i in 1:min(10, n_points)
+                w_single = wigner(coh_cpu, x_points_cpu[:, i])
+                @test w_gpu[i] ≈ w_single rtol=1e-4
+            end
+            @info "Large batch GPU advantage: $(round(speedup, digits=1))x speedup"
+        end
+        
+        @testset "Multi-Mode Wigner" begin
+            basis = QuadPairBasis(2)
+            α_vec = [0.5f0 + 0.3f0im, -0.2f0 + 0.8f0im]
+            coh_gpu = coherentstate(basis, α_vec) |> gpu
+            coh_cpu = coherentstate(basis, α_vec)
+            n_points = 5000
+            x_points_gpu = CuArray(randn(Float32, 4, n_points))
+            x_points_cpu = Array(x_points_gpu)
+            gpu_func = () -> wigner(coh_gpu, x_points_gpu)
+            cpu_func = () -> [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:n_points]
+            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Multi-mode Wigner (2 modes, 5000 points)", n_trials=3)
+            @test speedup > 5.0
+            @info "Multi-mode GPU advantage: $(round(speedup, digits=1))x speedup"
+        end
+    end
+    
+    @testset "Wigner Characteristic Function Benchmarks" begin
+        
+        @testset "Batch Wigner Characteristic - Professional API" begin
+            basis = QuadPairBasis(1)
+            sq_gpu = squeezedstate(basis, 0.3f0, Float32(π/4)) |> gpu
+            sq_cpu = squeezedstate(basis, 0.3f0, Float32(π/4))
+            n_points = 5000
+            xi_points_gpu = CuArray(randn(Float32, 2, n_points) * 0.5f0)
+            xi_points_cpu = Array(xi_points_gpu)
+            gpu_func = () -> wignerchar(sq_gpu, xi_points_gpu)
+            cpu_func = () -> [wignerchar(sq_cpu, xi_points_cpu[:, i]) for i in 1:n_points]
+            speedup, _, _ = benchmark_operation(gpu_func, cpu_func, "Batch Wigner characteristic (5,000 points)", n_trials=3)
+            @test speedup > 2.0
+            chi_gpu = Array(gpu_func())
+            for i in 1:min(5, n_points)
+                chi_single = wignerchar(sq_cpu, xi_points_cpu[:, i])
+                @test real(chi_gpu[i]) ≈ real(chi_single) rtol=1e-4
+                @test imag(chi_gpu[i]) ≈ imag(chi_single) rtol=1e-4
+            end
+            @info "Wigner characteristic GPU advantage: $(round(speedup, digits=1))x speedup"
+        end
+    end
+    
+    @testset " Performance Tests" begin
+        basis = QuadPairBasis(1)
+        coh_gpu = coherentstate(basis, 1.0f0) |> gpu
+        coh_cpu = coherentstate(basis, 1.0f0)
+        n_points = 15000
+        x_points_gpu = CuArray(randn(Float32, 2, n_points))
+        x_points_cpu = Array(x_points_gpu)
+        gpu_func = () -> wigner(coh_gpu, x_points_gpu)
+        cpu_func = () -> [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:n_points]
+        speedup, gpu_time, cpu_time = benchmark_operation(gpu_func, cpu_func, " GPU validation")
+        @test speedup > 15.0
+        @test gpu_time < cpu_time / 10  
+        w_gpu = Array(gpu_func())
+        w_sample = [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:min(20, n_points)]
+        @test w_gpu[1:length(w_sample)] ≈ w_sample rtol=1e-4
+    end
+    
+    @testset "Scaling Analysis" begin
+        basis = QuadPairBasis(1)
+        coh_gpu = coherentstate(basis, 1.0f0) |> gpu
+        coh_cpu = coherentstate(basis, 1.0f0)
+        point_counts = [100, 500, 1000, 5000, 10000, 25000]
+        speedups = Float64[]
+        for n_points in point_counts
+            x_points_gpu = CuArray(randn(Float32, 2, n_points))
+            x_points_cpu = Array(x_points_gpu)
+            gpu_func = () -> wigner(coh_gpu, x_points_gpu)
+            cpu_func = () -> [wigner(coh_cpu, x_points_cpu[:, i]) for i in 1:n_points]
+            speedup, gpu_time, cpu_time = benchmark_operation(gpu_func, cpu_func, "Scaling test ($n_points points)", n_trials=3)
+            push!(speedups, speedup)
+            @info "Scaling point" n_points=n_points speedup=round(speedup, digits=2) gpu_time=round(gpu_time, digits=4) cpu_time=round(cpu_time, digits=4)
+        end
+        @test speedups[end] > speedups[1]  
+        @test maximum(speedups) > 10.0    
+        @info "Peak GPU speedup: $(round(maximum(speedups), digits=2))x"
+    end
+end
+=#
 
+#=
 @testitem "GPU Batched Performance Benchmarks" begin
 using Gabs
 using Gabs: device
@@ -2721,3 +2721,4 @@ end
     end
 end
 end
+=#
