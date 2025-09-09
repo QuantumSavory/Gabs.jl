@@ -73,7 +73,6 @@ function changebasis(::Type{B1}, state::GaussianState{B2,M,V}) where {B1<:QuadBl
         cpu_result = changebasis(B1, cpu_state)
         return GaussianState(cpu_result.basis, CuArray(cpu_result.mean), CuArray(cpu_result.covar); ħ=cpu_result.ħ)
     end
-    
     nmodes = state.basis.nmodes
     T = eltype(M)
     mean_new = CUDA.zeros(T, 2*nmodes)
