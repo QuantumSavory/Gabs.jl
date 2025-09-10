@@ -1,5 +1,4 @@
-using TestItemRunner
-using Gabs
+
 
 CUDA_flag = false
 
@@ -17,6 +16,8 @@ end
 using Pkg
 CUDA_flag && Pkg.add("CUDA")
 
+using TestItemRunner
+using Gabs
 testfilter = ti -> begin
     exclude = Symbol[:jet]
     if get(ENV, "JET_TEST", "") == "true"
