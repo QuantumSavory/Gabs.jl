@@ -1,5 +1,3 @@
-
-
 CUDA_flag = false
 
 if Sys.iswindows()
