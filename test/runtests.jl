@@ -39,7 +39,3 @@ end
 println("Starting tests with $(Threads.nthreads()) threads out of `Sys.CPU_THREADS = $(Sys.CPU_THREADS)`...")
 
 @run_package_tests filter=testfilter
-
-if get(ENV,"JET_TEST","")=="true"
-    @run_package_tests filter=(ti -> :jet in ti.tags)
-end
