@@ -1,5 +1,9 @@
 # News
 
+## v1.3.2 - dev
+
+- Replace SymplecticFactorizations.jl as a dependency with SymplecticMatrices.jl.
+
 ## v1.3.2 - 2025-08-12
 
 - Add `GaussianLinearCombination` interface, with predefined `catstate`, `catstate_even`,
