@@ -15,7 +15,7 @@ export
     # types
     GaussianState, GaussianUnitary, GaussianChannel, GaussianLinearCombination,
     # Gaussian measurements
-    generaldyne, Generaldyne,
+    generaldyne, Generaldyne, homodyne, Homodyne,
     # symplectic representations
     QuadPairBasis, QuadBlockBasis, changebasis,
     # operations
@@ -61,6 +61,8 @@ include("factorizations.jl")
 include("measurements.jl")
 
 include("generaldyne.jl")
+
+include("homodyne.jl")
 
 include("wigner.jl")
 
