@@ -1,7 +1,7 @@
 # Gabs.jl
 
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://apkille.github.io/Gabs.jl/stable)
-[![](https://img.shields.io/badge/docs-dev-lightblue.svg)](https://apkille.github.io/Gabs.jl/dev)
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://QuantumSavory.github.io/Gabs.jl/stable)
+[![](https://img.shields.io/badge/docs-dev-lightblue.svg)](https://QuantumSavory.github.io/Gabs.jl/dev)
 [![Build status (Github Actions)](https://github.com/QuantumSavory/Gabs.jl/workflows/CI/badge.svg)](https://github.com/QuantumSavory/Gabs.jl/actions)
 [![codecov](https://codecov.io/github/QuantumSavory/Gabs.jl/graph/badge.svg?token=JWMOD4FY6P)](https://codecov.io/github/QuantumSavory/Gabs.jl)
 [![JET static analysis](https://img.shields.io/badge/%F0%9F%9B%A9%EF%B8%8F_tested_with-JET.jl-233f9a)](https://github.com/aviatesk/JET.jl)
