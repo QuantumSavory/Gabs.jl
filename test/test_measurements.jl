@@ -1,6 +1,6 @@
 @testitem "Measurements" begin
     using Gabs
-    using Random
+    using StableRNGs
     using StaticArrays
     using LinearAlgebra: det, I, cholesky, Symmetric
 
@@ -76,8 +76,8 @@
         
             for basis in (qpairbasis, qblockbasis)
                 vac = vacuumstate(basis)
-                @test_throws ArgumentError homodyne(vac, [1, 2], [0.0])
-                @test_throws ArgumentError homodyne(vac, [1], [0.0, π/2])
+                @test_throws MethodError homodyne(vac, [1, 2], [0.0])
+                @test_throws MethodError homodyne(vac, [1], [0.0, π/2])
             end
         
             # simple test case: measuring 1 mode of 2-mode state
@@ -97,12 +97,13 @@
                 @test isapprox(state.covar[1:2, 1:2], Matrix{Float64}(I,2,2), atol=1e-12)
             end
         
+            rng = StableRNG(123)
             coh = coherentstate(QuadPairBasis(3), 1.0)
             coh_block = changebasis(QuadBlockBasis, coh)
             angles, indices = [0.0], [2]
-            Random.seed!(42)
+            Random.seed!(rng, 123)
             M_pair = homodyne(coh, indices, angles)
-            Random.seed!(42)
+            Random.seed!(rng, 123)
             M_block = homodyne(coh_block, indices, angles)
             @test isapprox(M_pair.state, changebasis(QuadPairBasis, M_block.state))
             @test isapprox(M_pair.result, M_block.result, atol=1e-12)
@@ -162,8 +163,8 @@
             @test (hstatic.state).mean isa SVector && (hstatic.state).covar isa SMatrix
             @test isequal(hstatic.state.mean[1:2], zeros(2))
 
-            @test_throws MethodError rand(Homodyne, rs_qpair, collect(1:5), [0.0])
-            @test_throws MethodError rand(Homodyne, rs_qblock, collect(1:5), [π/2])
+            @test_throws ArgumentError rand(Homodyne, rs_qpair, collect(1:5), [0.0])
+            @test_throws ArgumentError rand(Homodyne, rs_qblock, collect(1:5), [π/2])
         end        
     end
 end
