@@ -643,6 +643,114 @@ function _ptrace(state::GaussianState{B,M,V}, indices::T) where {B<:QuadBlockBas
 end
 
 """
+    embed(basis::SymplecticBasis, idx::Int, state::GaussianState)
+    embed(basis::SymplecticBasis, indices::AbstractVector{<:Int}, state::GaussianState)
+
+Embed a smaller Gaussian state into a larger Hilbert space specified by a target
+symplectic basis, inserting it at the mode index (or indices) specified by `idx` or `indices`.
+
+The embedded state's mean vector and covariance matrix are inserted into the larger space,
+and all other modes are initialized in the vacuum state (zero mean, covariance equal to ħ/2 × I).
+The function returns a new `GaussianState` with the full `basis`.
+
+## Example
+```jldoctest
+julia> state = squeezedstate(QuadBlockBasis(1), 1.0, pi/4);
+
+julia> embed(QuadBlockBasis(3), 2, state)
+GaussianState for 3 modes.
+  symplectic basis: QuadBlockBasis
+mean: 6-element Vector{Float64}:
+ 0.0
+ 0.0
+ 0.0
+ 0.0
+ 0.0
+ 0.0
+covariance: 6×6 Matrix{Float64}:
+ 1.0   0.0      0.0  0.0   0.0      0.0
+ 0.0   1.19762  0.0  0.0  -2.56458  0.0
+ 0.0   0.0      1.0  0.0   0.0      0.0
+ 0.0   0.0      0.0  1.0   0.0      0.0
+ 0.0  -2.56458  0.0  0.0   6.32677  0.0
+ 0.0   0.0      0.0  0.0   0.0      1.0
+```
+"""
+function embed(
+    basis::QuadPairBasis, index::Int, state::GaussianState{<:QuadPairBasis,M,V}
+    ) where {M,V}
+    return embed(basis, [index], state)
+end
+function embed(
+    basis::QuadPairBasis, indices::Vector{<:Int}, state::GaussianState{<:QuadPairBasis,M,V}
+) where {M,V}
+    @assert length(indices) == state.basis.nmodes "Number of indices must match number of modes in the state"
+    @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
+
+    total_modes = basis.nmodes
+    sub_modes = (state.basis).nmodes
+    dim = 2 * total_modes
+    ħ = state.ħ
+    # initialize mean and covariance with vacuum
+    mean = zeros(eltype(state.mean), dim)
+    covar = Matrix{eltype(state.covar)}(I, dim, dim) .* (ħ / 2)
+
+    # map substate mean and covar into full system
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx = indices[i]
+        mean[2idx-1] = state.mean[2i-1]
+        mean[2idx]   = state.mean[2i]
+    end
+
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx_i = indices[i]
+        @inbounds for j in Base.OneTo(sub_modes)
+            idx_j = indices[j]
+            covar[2idx_i-1, 2idx_j-1] = state.covar[2i-1, 2j-1]
+            covar[2idx_i-1, 2idx_j]   = state.covar[2i-1, 2j]
+            covar[2idx_i,   2idx_j-1] = state.covar[2i,   2j-1]
+            covar[2idx_i,   2idx_j]   = state.covar[2i,   2j]
+        end
+    end
+    return Gabs.GaussianState(basis, mean, covar; ħ)
+end
+function embed(
+    basis::QuadBlockBasis, index::Int, state::GaussianState{<:QuadBlockBasis,M,V}
+) where {M,V}
+    return embed(basis, [index], state)
+end
+function embed(
+    basis::QuadBlockBasis, indices::Vector{<:Int}, state::GaussianState{<:QuadBlockBasis,M,V}
+) where {M,V}
+    @assert length(indices) == state.basis.nmodes "Number of indices must match number of modes in the state"
+    @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
+
+    total_modes = basis.nmodes
+    sub_modes = state.basis.nmodes
+    ħ = state.ħ
+
+    mean = zeros(eltype(state.mean), 2 * total_modes)
+    covar = Matrix{eltype(state.covar)}(I*(ħ / 2), 2 * total_modes, 2 * total_modes)
+
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx = indices[i]
+        mean[idx] = state.mean[i]
+        mean[idx + total_modes] = state.mean[i + sub_modes]
+    end
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx_i = indices[i]
+        @inbounds for j in Base.OneTo(sub_modes)
+            idx_j = indices[j]
+            covar[idx_i, idx_j] = state.covar[i, j]
+            covar[idx_i, idx_j + total_modes] = state.covar[i, j + sub_modes]
+            covar[idx_i + total_modes, idx_j] = state.covar[i + sub_modes, j]
+            covar[idx_i + total_modes, idx_j + total_modes] = state.covar[i + sub_modes, j + sub_modes]
+        end
+    end
+    return GaussianState(basis, mean, covar; ħ)
+end
+
+"""
     changebasis(::SymplecticBasis, state::GaussianState)
 
 Change the symplectic basis of a Gaussian state.

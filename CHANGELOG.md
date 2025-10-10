@@ -3,6 +3,7 @@
 ## v1.3.2 - dev
 
 - Replace SymplecticFactorizations.jl as a dependency with SymplecticMatrices.jl.
+- Define `embed` for Gaussian states.
 
 ## v1.3.2 - 2025-08-12
 
