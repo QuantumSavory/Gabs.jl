@@ -655,7 +655,7 @@ The function returns a new `GaussianState` with the full `basis`.
 
 ## Example
 ```jldoctest
-julia> julia> state = squeezedstate(QuadBlockBasis(1), 1.0, pi/4);
+julia> state = squeezedstate(QuadBlockBasis(1), 1.0, pi/4);
 
 julia> embed(QuadBlockBasis(3), 2, state)
 GaussianState for 3 modes.
