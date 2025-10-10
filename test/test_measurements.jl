@@ -1,5 +1,6 @@
 @testitem "Measurements" begin
     using Gabs
+    using Random
     using StableRNGs
     using StaticArrays
     using LinearAlgebra: det, I, cholesky, Symmetric
@@ -9,7 +10,6 @@
         qpairbasis, qblockbasis = QuadPairBasis(1), QuadBlockBasis(1)
         for basis in [qpairbasis, qblockbasis]
             vac = vacuumstate(basis)
-            @test_throws ArgumentError homodyne(vac, [1, 2])
             @test_throws ArgumentError generaldyne(vac ⊗ vac, [1], proj = zeros(4, 4))
             @test_throws ArgumentError generaldyne(vac ⊗ vac, [1], proj = GaussianState(basis ⊕ basis, zeros(4), zeros(4, 4)))
             vacs = vac ⊗ vac ⊗ vac ⊗ vac
@@ -76,8 +76,8 @@
         
             for basis in (qpairbasis, qblockbasis)
                 vac = vacuumstate(basis)
-                @test_throws MethodError homodyne(vac, [1, 2], [0.0])
-                @test_throws MethodError homodyne(vac, [1], [0.0, π/2])
+                @test_throws ArgumentError homodyne(vac, [1, 2], [0.0])
+                @test_throws ArgumentError homodyne(vac, [1], [0.0, π/2])
             end
         
             # simple test case: measuring 1 mode of 2-mode state
