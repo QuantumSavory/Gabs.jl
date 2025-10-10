@@ -2,7 +2,7 @@
     using Gabs
     using Random
     using StaticArrays
-    using LinearAlgebra: det, I
+    using LinearAlgebra: det, I, cholesky, Symmetric
 
     @testset "generaldyne" begin
 
@@ -162,8 +162,8 @@
             @test (hstatic.state).mean isa SVector && (hstatic.state).covar isa SMatrix
             @test isequal(hstatic.state.mean[1:2], zeros(2))
 
-            @test_throws ArgumentError rand(Homodyne, rs_qpair, collect(1:5), [0.0])
-            @test_throws ArgumentError rand(Homodyne, rs_qblock, collect(1:5), [π/2])
+            @test_throws MethodError rand(Homodyne, rs_qpair, collect(1:5), [0.0])
+            @test_throws MethodError rand(Homodyne, rs_qblock, collect(1:5), [π/2])
         end        
     end
 end
