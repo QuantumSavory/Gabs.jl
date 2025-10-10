@@ -40,7 +40,7 @@ Note the measured modes are replaced with vacuum states after the homodyne measu
 julia> st = squeezedstate(QuadBlockBasis(3), 1.0, pi/4);
 
 julia> M = homodyne(st, [1, 3], [0.0, pi/2])
-Generaldyne{Vector{Float64}, GaussianState{QuadBlockBasis{Int64}, Vector{Float64}, Matrix{Float64}}}
+Homodyne{Vector{Float64}, GaussianState{QuadBlockBasis{Int64}, Vector{Float64}, Matrix{Float64}}}
 result:
 4-element Vector{Float64}:
         -0.10967467526473408
