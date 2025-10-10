@@ -1,7 +1,5 @@
 @testitem "Measurements" begin
     using Gabs
-    using Random
-    using StableRNGs
     using StaticArrays
     using LinearAlgebra: det, I, cholesky, Symmetric
 
