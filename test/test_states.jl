@@ -144,7 +144,7 @@
             @test embed(full_basis, [1,3], s1 ⊗ s3) == s1 ⊗ vacuumstate(basis) ⊗ s3
             @test embed(full_basis, [2,3], s2 ⊗ s3) == vacuumstate(basis) ⊗ s2 ⊗ s3
 
-            @test ptrace(embed(full_basis, 2, s1), 1) == s1
+            @test ptrace(embed(full_basis, 2, s1), [1,3]) == s1
             @test ptrace(embed(full_basis, [2,3], s1 ⊗ s2), [1]) == s1 ⊗ s2
     
             @test_throws AssertionError embed(full_basis, [1,2,3,4], s1 ⊗ s2 ⊗ s3)
