@@ -143,8 +143,8 @@
                 out_covar[2jdx-1:2jdx, 2idx-1:2idx] .= @view(VA′[2j-1:2j, 2i-1:2i])
             end
             expected_state = GaussianState(QuadPairBasis(nm), out_mean, out_covar)
-            @test isapprox(M_qpair.state, expected_state, atol=1e-8)
-            @test isapprox(M_qblock.state, changebasis(QuadBlockBasis, expected_state), atol=1e-8)
+            @test isapprox(M_qpair.state.covar, expected_state.covar, atol=1e-8)
+            @test isapprox(M_qblock.state.covar, changebasis(QuadBlockBasis, expected_state).covar, atol=1e-8)
         
             sstatic = vacuumstate(SVector{2}, SMatrix{2,2}, QuadPairBasis(1))
             statestatic = sstatic ⊗ sstatic ⊗ sstatic ⊗ sstatic

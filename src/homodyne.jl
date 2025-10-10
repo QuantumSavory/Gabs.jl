@@ -106,7 +106,7 @@ function homodyne(
     mean′′ = Gabs._promote_output_vector(Tm, mean′, 2*nmodes)
     covar′′ = Gabs._promote_output_matrix(Tc, covar′, 2*nmodes)
     state′ = GaussianState(basis, mean′′, covar′′, ħ = state.ħ)
-    return Generaldyne(result′, state′)
+    return Homodyne(result′, state′)
 end
 function homodyne(
     state::GaussianState{<:QuadBlockBasis,Tm,Tc}, 
@@ -145,7 +145,7 @@ function homodyne(
     mean′′ = Gabs._promote_output_vector(Tm, mean′, 2*nmodes)
     covar′′ = Gabs._promote_output_matrix(Tc, covar′, 2*nmodes)
     state′ = GaussianState(basis, mean′′, covar′′, ħ = state.ħ)
-    return Generaldyne(result′, state′)
+    return Homodyne(result′, state′)
 end
 
 """
