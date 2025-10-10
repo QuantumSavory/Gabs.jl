@@ -655,25 +655,25 @@ The function returns a new `GaussianState` with the full `basis`.
 
 ## Example
 ```jldoctest
-julia> state = randstate(QuadBlockBasis(1));
+julia> julia> state = squeezedstate(QuadBlockBasis(1), 1.0, pi/4);
 
 julia> embed(QuadBlockBasis(3), 2, state)
 GaussianState for 3 modes.
   symplectic basis: QuadBlockBasis
 mean: 6-element Vector{Float64}:
-  0.0
- -0.2147477907765907
-  0.0
-  0.0
- -0.4251221901772775
-  0.0
+ 0.0
+ 0.0
+ 0.0
+ 0.0
+ 0.0
+ 0.0
 covariance: 6×6 Matrix{Float64}:
- 1.0  0.0       0.0  0.0  0.0       0.0
- 0.0  1.69986   0.0  0.0  0.173058  0.0
- 0.0  0.0       1.0  0.0  0.0       0.0
- 0.0  0.0       0.0  1.0  0.0       0.0
- 0.0  0.173058  0.0  0.0  2.1937    0.0
- 0.0  0.0       0.0  0.0  0.0       1.0
+ 1.0   0.0      0.0  0.0   0.0      0.0
+ 0.0   1.19762  0.0  0.0  -2.56458  0.0
+ 0.0   0.0      1.0  0.0   0.0      0.0
+ 0.0   0.0      0.0  1.0   0.0      0.0
+ 0.0  -2.56458  0.0  0.0   6.32677  0.0
+ 0.0   0.0      0.0  0.0   0.0      1.0
 ```
 """
 function embed(
