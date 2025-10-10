@@ -84,7 +84,7 @@
             for basis in (QuadPairBasis(2), QuadBlockBasis(2))
                 st = vacuumstate(basis) ⊗ vacuumstate(basis)
                 M = homodyne(st, [1], [0.0])
-                @test isa(M, Generaldyne)
+                @test M isa Homodyne
                 @test M.result isa Vector
                 @test M.state isa GaussianState
         
