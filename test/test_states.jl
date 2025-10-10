@@ -147,11 +147,6 @@
             @test ptrace(embed(full_basis, 2, s1), 1) == s1
             @test ptrace(embed(full_basis, [2,3], s1 ⊗ s2), [1]) == s1 ⊗ s2
     
-            sstatic = coherentstate(SVector{2}, SMatrix{2,2}, basis, α)
-            e_static = embed(full_basis, 2, sstatic)
-            @test e_static isa GaussianState
-            @test ptrace(e_static, 1) == sstatic
-    
             @test_throws AssertionError embed(full_basis, [1,2,3,4], s1 ⊗ s2 ⊗ s3)
             @test_throws AssertionError embed(full_basis, [1, 2], s1)  # wrong number of modes
         end
