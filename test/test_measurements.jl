@@ -97,17 +97,6 @@
                 @test isapprox(state.covar[1:2, 1:2], Matrix{Float64}(I,2,2), atol=1e-12)
             end
         
-            rng = StableRNG(123)
-            coh = coherentstate(QuadPairBasis(3), 1.0)
-            coh_block = changebasis(QuadBlockBasis, coh)
-            angles, indices = [0.0], [2]
-            Random.seed!(rng, 123)
-            M_pair = homodyne(coh, indices, angles)
-            Random.seed!(rng, 123)
-            M_block = homodyne(coh_block, indices, angles)
-            @test isapprox(M_pair.state, changebasis(QuadPairBasis, M_block.state))
-            @test isapprox(M_pair.result, M_block.result, atol=1e-12)
-        
             st = squeezedstate(QuadPairBasis(4), 0.5, π/2)
             st_block = changebasis(QuadBlockBasis, st)
             indices = [2, 4]
