@@ -48,7 +48,7 @@
         @test isgaussian(rs_pair, atol = 1e-5)
         @test isgaussian(rs_block, atol = 1e-5)
         cp_rs_pair = copy(rs_pair)
-        cp_rs_block = copy(rs_pair)
+        cp_rs_block = copy(rs_block)
         @test cp_rs_pair == rs_pair && cp_rs_block == rs_block
         @test Gabs.nmodes(rs_pair) == nmodes
         @test Gabs.nmodes(rs_block) == nmodes
