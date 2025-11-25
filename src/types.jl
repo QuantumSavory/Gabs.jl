@@ -44,7 +44,8 @@ function Base.show(io::IO, mime::MIME"text/plain", x::GaussianState)
     print(io, "\ncovariance: ")
     Base.show(io, mime, x.covar)
 end
-
+Base.copy(x::GaussianState) = GaussianState(x.basis, copy(x.mean), copy(x.covar); ħ = x.ħ)
+nmodes(x::GaussianState) = nmodes(x.basis)
 
 """
 Defines a Gaussian unitary for an N-mode bosonic system over a 2N-dimensional phase space.
@@ -101,6 +102,8 @@ function Base.show(io::IO, mime::MIME"text/plain", x::GaussianUnitary)
     print(io, "\nsymplectic: ")
     Base.show(io, mime, x.symplectic)
 end
+Base.copy(x::GaussianUnitary) = GaussianUnitary(x.basis, copy(x.disp), copy(x.symplectic); ħ = x.ħ)
+nmodes(x::GaussianUnitary) = nmodes(x.basis)
 
 function Base.:(*)(op::GaussianUnitary, state::GaussianState)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
@@ -198,6 +201,8 @@ function Base.summary(io::IO, x::Union{GaussianState,GaussianUnitary,GaussianCha
         print(io, " for $(modenum) modes.")
     end
 end
+Base.copy(x::GaussianChannel) = GaussianChannel(x.basis, copy(x.disp), copy(x.transform), copy(x.noise); ħ = x.ħ)
+nmodes(x::GaussianChannel) = nmodes(x.basis)
 
 function Base.:(*)(op::GaussianChannel, state::GaussianState)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))

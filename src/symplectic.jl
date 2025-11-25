@@ -1,5 +1,7 @@
 abstract type SymplecticBasis{N} end
 
+nmodes(x::SymplecticBasis) = x.nmodes
+
 """
 Defines a symplectic basis for a bosonic system of size `nmodes` in which
 the quadrature field operators are arranged pairwise.
