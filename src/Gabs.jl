@@ -3,23 +3,23 @@ module Gabs
 import LinearAlgebra
 using LinearAlgebra: I, det, mul!, diag, qr, eigvals, Diagonal, cholesky, Symmetric, dot, Hermitian, logdet
 
-import QuantumInterface: StateVector, AbstractOperator, apply!, tensor, ⊗, directsum, ⊕, entropy_vn, fidelity, logarithmic_negativity, ptrace
+import QuantumInterface: StateVector, AbstractOperator, apply!, tensor, ⊗, directsum, ⊕, entropy_vn, fidelity, logarithmic_negativity, ptrace, embed
 
 import Random
 using Random: randn!
 
-import SymplecticFactorizations: williamson, Williamson, polar, Polar, blochmessiah, BlochMessiah, randsymplectic, symplecticform, issymplectic
-using SymplecticFactorizations: williamson, Williamson, polar, Polar, blochmessiah, BlochMessiah, BlockForm, PairForm
+import SymplecticMatrices: williamson, Williamson, polar, Polar, blochmessiah, BlochMessiah, randsymplectic, symplecticform, issymplectic
+using SymplecticMatrices: williamson, Williamson, polar, Polar, blochmessiah, BlochMessiah, BlockForm, PairForm
 
 export
     # types
     GaussianState, GaussianUnitary, GaussianChannel, GaussianLinearCombination,
     # Gaussian measurements
-    generaldyne, Generaldyne,
+    generaldyne, Generaldyne, homodyne, Homodyne,
     # symplectic representations
     QuadPairBasis, QuadBlockBasis, changebasis,
     # operations
-    tensor, ⊗, directsum, ⊕, apply!, ptrace,
+    tensor, ⊗, directsum, ⊕, apply!, ptrace, embed,
     # predefined Gaussian states
     vacuumstate, thermalstate, coherentstate, squeezedstate, eprstate,
     # non-Gaussian states
@@ -68,6 +68,8 @@ include("factorizations.jl")
 include("measurements.jl")
 
 include("generaldyne.jl")
+
+include("homodyne.jl")
 
 include("wigner.jl")
 

@@ -1,9 +1,9 @@
 # Gabs.jl
 
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://apkille.github.io/Gabs.jl/stable)
-[![](https://img.shields.io/badge/docs-dev-lightblue.svg)](https://apkille.github.io/Gabs.jl/dev)
-[![Build status (Github Actions)](https://github.com/apkille/Gabs.jl/workflows/CI/badge.svg)](https://github.com/apkille/Gabs.jl/actions)
-[![codecov](https://codecov.io/github/apkille/Gabs.jl/graph/badge.svg?token=JWMOD4FY6P)](https://codecov.io/github/apkille/Gabs.jl)
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://QuantumSavory.github.io/Gabs.jl/stable)
+[![](https://img.shields.io/badge/docs-dev-lightblue.svg)](https://QuantumSavory.github.io/Gabs.jl/dev)
+[![Build status (Github Actions)](https://github.com/QuantumSavory/Gabs.jl/workflows/CI/badge.svg)](https://github.com/QuantumSavory/Gabs.jl/actions)
+[![codecov](https://codecov.io/github/QuantumSavory/Gabs.jl/graph/badge.svg?token=JWMOD4FY6P)](https://codecov.io/github/QuantumSavory/Gabs.jl)
 [![JET static analysis](https://img.shields.io/badge/%F0%9F%9B%A9%EF%B8%8F_tested_with-JET.jl-233f9a)](https://github.com/aviatesk/JET.jl)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
@@ -14,7 +14,7 @@ characterized by low-dimensional matrices in the phase space representation.
 Thus, a large class of continuous variable quantum information can be efficiently
 simulated on a classical computer. Gabs.jl provides a high-level [Julia](https://julialang.org) interface for straightforward and high performance implementations of Gaussian quantum systems.
 
-See the detailed [suggested readings & references page](https://apkille.github.io/Gabs.jl/dev/bibliography/) for a background on quantum information with Gaussian states.
+See the detailed [suggested readings & references page](https://QuantumSavory.github.io/Gabs.jl/dev/bibliography/) for a background on quantum information with Gaussian states.
 
 ## Installation
 
