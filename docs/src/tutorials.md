@@ -118,7 +118,7 @@ Importantly, methods that create or manipulate a Gaussian state, such as [`tenso
 
 Create Gaussian states with symbolic variables using [Symbolics.jl](https://github.com/JuliaSymbolics/Symbolics.jl):
 
-```jldoctest
+```julia
 julia> using Symbolics
 
 julia> @variables r θ τ
