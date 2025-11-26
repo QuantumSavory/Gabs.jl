@@ -42,6 +42,7 @@
         vac_block = vacuumstate(qblockbasis)
         lc_block = GaussianLinearCombination(vac_block)
         @test lc_block.basis == qblockbasis
+        @test Gabs.nmodes(vac_block) == nmodes
     end
     
     @testset "Convenient GaussianState Arithmetic Interface" begin

@@ -48,10 +48,10 @@
         @test isgaussian(rs_pair, atol = 1e-5)
         @test isgaussian(rs_block, atol = 1e-5)
         cp_rs_pair = copy(rs_pair)
-        cp_rs_block = copy(rs_pair)
+        cp_rs_block = copy(rs_block)
         @test cp_rs_pair == rs_pair && cp_rs_block == rs_block
-        @test nmodes(rs_pair) == nmodes
-        @test nmodes(rs_block) == nmodes
+        @test Gabs.nmodes(rs_pair) == nmodes
+        @test Gabs.nmodes(rs_block) == nmodes
 
         rspure_pair = randstate(qpairbasis, pure = true, ħ = ħ)
         rspure_block = randstate(qblockbasis, pure = true, ħ = ħ)
@@ -92,7 +92,7 @@
 
         cp_ru = copy(ru)
         @test cp_ru == ru
-        @test nmodes(ru) == nmodes
+        @test Gabs.nmodes(ru) == nmodes
 
         rupassive = randunitary(qpairbasis, passive = true)
         @test rupassive.ħ == 2
@@ -125,7 +125,7 @@
 
         cp_rc = copy(rc)
         @test cp_rc == rc
-        @test nmodes(rc) == nmodes
+        @test Gabs.nmodes(rc) == nmodes
 
         rc_array = randchannel(Array, qpairbasis)
         @test rc_array.ħ == 2

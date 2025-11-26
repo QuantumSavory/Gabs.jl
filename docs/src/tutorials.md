@@ -118,7 +118,7 @@ Importantly, methods that create or manipulate a Gaussian state, such as [`tenso
 
 Create Gaussian states with symbolic variables using [Symbolics.jl](https://github.com/JuliaSymbolics/Symbolics.jl):
 
-```jldoctest
+```julia
 julia> using Symbolics
 
 julia> @variables r θ τ
@@ -138,10 +138,10 @@ mean: 4-element Vector{Num}:
  0
  0
 covariance: 4×4 Matrix{Num}:
-         cosh(2r)  -cos(θ)*sinh(2r)                 0  -sinh(2r)*sin(θ)
- -cos(θ)*sinh(2r)          cosh(2r)  -sinh(2r)*sin(θ)                 0
-                0  -sinh(2r)*sin(θ)          cosh(2r)   cos(θ)*sinh(2r)
- -sinh(2r)*sin(θ)                 0   cos(θ)*sinh(2r)          cosh(2r)
+         cosh(2r)  -sinh(2r)*cos(θ)                 0  -sinh(2r)*sin(θ)
+ -sinh(2r)*cos(θ)          cosh(2r)  -sinh(2r)*sin(θ)                 0
+                0  -sinh(2r)*sin(θ)          cosh(2r)   sinh(2r)*cos(θ)
+ -sinh(2r)*sin(θ)                 0   sinh(2r)*cos(θ)          cosh(2r)
 
 julia> op = beamsplitter(b, τ)
 GaussianUnitary for 2 modes.

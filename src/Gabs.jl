@@ -38,8 +38,10 @@ export
     williamson, Williamson, polar, Polar, blochmessiah, BlochMessiah,
     # metrics
     purity, entropy_vn, fidelity, logarithmic_negativity,
-    cross_wigner, cross_wignerchar
-
+    cross_wigner, cross_wignerchar,
+    # additional interface
+    nmodes
+    
 include("errors.jl")
 
 include("utils.jl")

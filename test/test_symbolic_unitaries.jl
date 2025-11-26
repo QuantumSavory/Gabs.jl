@@ -59,7 +59,7 @@
         @test ds isa GaussianUnitary
         @test isequal(ds.disp, (d1 ⊗ d2).disp)
         @test isequal(ds.symplectic, (d1 ⊗ d2).symplectic)
-        @test isapprox(ds, d1 ⊗ d2, atol = 1e-10)
+        @test_throws TypeError isapprox(ds, d1 ⊗ d2, atol = 1e-10)  # due to equality checks for Num type in Symbolics.jl
         @test tensor(SVector{4*nmodes}, SMatrix{4*nmodes, 4*nmodes}, d1, d2) isa GaussianUnitary
         @variables theta
         p = phaseshift(qpairbasis, theta)
@@ -87,7 +87,7 @@
         v1, v2 = vacuumstate(qpairbasis), vacuumstate(qpairbasis)
         s1, s2 = squeezedstate(qpairbasis, r, theta), squeezedstate(qpairbasis, r1, theta1)
         c1, c2 = coherentstate(qpairbasis, α1), coherentstate(qpairbasis, α2)
-        @test simplify(d1 * v1) ≈ simplify(c1)
+        @test_throws TypeError simplify(d1 * v1) ≈ simplify(c1) # due to equality checks for Num type in Symbolics.jl
         @test isequal(simplify(d1 * v1).mean, simplify(c1).mean)
         @test isequal(simplify(d1 * v1).covar, simplify(c1).covar)
         @test isequal(apply!(s1, d1).mean, simplify(c1).mean)

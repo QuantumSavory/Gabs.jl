@@ -117,6 +117,8 @@ function GaussianLinearCombination(pairs::Pair{<:Number,<:GaussianState}...)
     return GaussianLinearCombination(basis, coeffs, states)
 end
 
+nmodes(x::GaussianLinearCombination) = nmodes(x[1])
+
 """
     +(lc1::GaussianLinearCombination, lc2::GaussianLinearCombination)
 
