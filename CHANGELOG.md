@@ -1,9 +1,11 @@
 # News
 
-## v1.3.2 - dev
+## v1.3.3 - 2025-12-13
 
 - Replace SymplecticFactorizations.jl as a dependency with SymplecticMatrices.jl.
 - Define `embed` for Gaussian states.
+- Add `homodyne` interface.
+- Add `nmodes` function.
 
 ## v1.3.2 - 2025-08-12
 

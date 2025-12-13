@@ -1,7 +1,7 @@
 name = "Gabs"
 uuid = "0eb812ee-a11f-4f5e-b8d4-bb8a44f06f50"
 authors = ["Andrew Kille"]
-version = "1.3.2-dev"
+version = "1.3.3"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
