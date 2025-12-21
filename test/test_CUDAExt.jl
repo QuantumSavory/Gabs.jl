@@ -2219,7 +2219,7 @@ end
 
 #Benchmark code
 #=
-@testitem "GPU Performance Benchmarks for Wigner and Tensor" tags=[:cuda] begin
+@testitem "GPU Performance Benchmarks for Wigner and Tensor" #=tags=[:cuda]=# begin
     using CUDA
     using Gabs
     using Gabs: device
@@ -2719,5 +2719,5 @@ end
             end
         end
     end
-end
-=#
+end=#
+

@@ -1,18 +1,19 @@
 name = "Gabs"
 uuid = "0eb812ee-a11f-4f5e-b8d4-bb8a44f06f50"
-authors = ["Andrew Kille"]
 version = "1.3.3"
+authors = ["Andrew Kille"]
 
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 QuantumInterface = "5717a53b-5d69-4fa3-b976-0bf2f97ca1e5"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SymplecticMatrices = "d07eab47-f98b-4620-8fe1-ee63e153d4ef"
 
 [weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 
 [extensions]
 CUDAExt = "CUDA"
@@ -20,6 +21,7 @@ MakieExt = "Makie"
 StaticArraysExt = "StaticArrays"
 
 [compat]
+BenchmarkTools = "1.6.3"
 CUDA = "5"
 LinearAlgebra = "1.9"
 Makie = "0.21, 0.22, 0.23, 0.24"

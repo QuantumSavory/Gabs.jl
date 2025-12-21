@@ -73,27 +73,19 @@ function Gabs.wigner(state::GaussianState{B,M,V}, x::AbstractVector) where {B<:S
         cpu_state = GaussianState(state.basis, Array(state.mean), Array(state.covar); ħ = state.ħ)
         return Gabs.wigner(cpu_state, x)
     end
-    
     basis = state.basis
     nmodes = basis.nmodes
-    mean = state.mean
-    covar = state.covar
-    
-    length(mean) == length(x) || throw(ArgumentError(WIGNER_ERROR))
-    
-    T = eltype(mean)
-    x_gpu = CuArray(T.(x))
-    
-    diff = x_gpu .- mean
-    covar_inv = inv(covar)
-    
+    length(state.mean) == length(x) || throw(ArgumentError(WIGNER_ERROR))
+    T = eltype(state.mean)
+    mean_cpu = Array(state.mean)
+    covar_cpu = Array(state.covar)
+    x_cpu = T.(Array(x))
+    diff = x_cpu .- mean_cpu
+    covar_inv = inv(covar_cpu)
     quad_form = dot(diff, covar_inv * diff)
-    
-    det_covar = det(covar)
+    det_covar = det(covar_cpu)
     normalization = (2 * T(π))^nmodes * sqrt(det_covar)
-    
     result = exp(-0.5 * quad_form) / normalization
-    
     return result  
 end
 
