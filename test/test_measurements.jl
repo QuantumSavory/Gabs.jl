@@ -1,5 +1,6 @@
 @testitem "Measurements" begin
     using Gabs
+    using Random
     using StaticArrays
     using LinearAlgebra: det, I, cholesky, Symmetric
 
@@ -149,6 +150,24 @@
             hstatic = homodyne(statestatic, [2], [π/4])
             @test (hstatic.state).mean isa SVector && (hstatic.state).covar isa SMatrix
             @test isequal(hstatic.state.mean[1:2], zeros(2))
+
+            seed = 4242
+            base_state = squeezedstate(QuadPairBasis(2), 0.3, π/4)
+            base_state_block = changebasis(QuadBlockBasis, base_state)
+
+            h1 = homodyne(MersenneTwister(seed), base_state, [1], [0.0])
+            h2 = homodyne(MersenneTwister(seed), base_state, [1], [0.0])
+            @test h1.result == h2.result
+            @test h1.state == h2.state
+
+            hb1 = homodyne(MersenneTwister(seed), base_state_block, [1], [0.0])
+            hb2 = homodyne(MersenneTwister(seed), base_state_block, [1], [0.0])
+            @test hb1.result == hb2.result
+            @test hb1.state == hb2.state
+
+            samples_kw = rand(Homodyne, base_state, [1], [π/2]; shots = 3, rng = MersenneTwister(seed))
+            samples_pos = rand(MersenneTwister(seed), Homodyne, base_state, [1], [π/2]; shots = 3)
+            @test samples_kw == samples_pos
 
             @test_throws ArgumentError rand(Homodyne, rs_qpair, collect(1:5), [0.0])
             @test_throws ArgumentError rand(Homodyne, rs_qblock, collect(1:5), [π/2])

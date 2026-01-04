@@ -6,7 +6,7 @@ using LinearAlgebra: I, det, mul!, diag, qr, eigvals, Diagonal, cholesky, Symmet
 import QuantumInterface: StateVector, AbstractOperator, apply!, tensor, ⊗, directsum, ⊕, entropy_vn, fidelity, logarithmic_negativity, ptrace, embed
 
 import Random
-using Random: randn!
+using Random: randn!, AbstractRNG
 
 import SymplecticMatrices: williamson, Williamson, polar, Polar, blochmessiah, BlochMessiah, randsymplectic, symplecticform, issymplectic
 using SymplecticMatrices: williamson, Williamson, polar, Polar, blochmessiah, BlochMessiah, BlockForm, PairForm

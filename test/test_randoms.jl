@@ -1,5 +1,6 @@
 @testitem "Random objects" begin
     using Gabs
+    using Random
     using StaticArrays
     using LinearAlgebra: eigvals, adjoint
 
@@ -7,13 +8,14 @@
         nmodes = rand(1:5)
         qpairbasis = QuadPairBasis(nmodes)
         qblockbasis = QuadBlockBasis(nmodes)
-        U_qpair = Gabs._rand_unitary(qpairbasis)
-        U_qblock = Gabs._rand_unitary(qblockbasis)
+        rng = Random.default_rng()
+        U_qpair = Gabs._rand_unitary(rng, qpairbasis)
+        U_qblock = Gabs._rand_unitary(rng, qblockbasis)
         @test isapprox(adjoint(U_qpair), inv(U_qpair), atol = 1e-5)
         @test isapprox(adjoint(U_qblock), inv(U_qblock), atol = 1e-5)
 
-        O_qpair = Gabs._rand_orthogonal_symplectic(qpairbasis)
-        O_qblock = Gabs._rand_orthogonal_symplectic(qblockbasis)
+        O_qpair = Gabs._rand_orthogonal_symplectic(rng, qpairbasis)
+        O_qblock = Gabs._rand_orthogonal_symplectic(rng, qblockbasis)
         @test isapprox(O_qpair', inv(O_qpair), atol = 1e-5)
         @test isapprox(O_qblock', inv(O_qblock), atol = 1e-5)
         @test issymplectic(qpairbasis, O_qpair, atol = 1e-5)
@@ -134,5 +136,30 @@
         rc_static = randchannel(SVector{2*nmodes}, SMatrix{2*nmodes, 2*nmodes}, qpairbasis)
         @test rc_static.ħ == 2
         @test isgaussian(rc_static, atol = 1e-5)
+    end
+
+    @testset "rng control" begin
+        seed = 2026
+        basis = QuadPairBasis(3)
+
+        rs1 = randstate(MersenneTwister(seed), basis)
+        rs2 = randstate(MersenneTwister(seed), basis)
+        @test rs1 == rs2
+
+        rs_kw = randstate(basis; rng = MersenneTwister(seed))
+        rs_pos = randstate(MersenneTwister(seed), basis)
+        @test rs_kw == rs_pos
+
+        ru1 = randunitary(MersenneTwister(seed), basis)
+        ru2 = randunitary(MersenneTwister(seed), basis)
+        @test ru1 == ru2
+
+        rc1 = randchannel(MersenneTwister(seed), basis)
+        rc2 = randchannel(MersenneTwister(seed), basis)
+        @test rc1 == rc2
+
+        S1 = randsymplectic(MersenneTwister(seed), basis)
+        S2 = randsymplectic(MersenneTwister(seed), basis)
+        @test S1 == S2
     end
 end
