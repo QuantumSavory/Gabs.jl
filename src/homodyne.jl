@@ -74,7 +74,8 @@ true
 function homodyne(
     state::GaussianState{<:QuadPairBasis,Tm,Tc}, 
     indices::R, 
-    angles::G
+    angles::G;
+    rng::AbstractRNG = Random.default_rng()
 ) where {Tm,Tc,R,G}
     basis = state.basis
     nmodes = basis.nmodes
@@ -82,7 +83,7 @@ function homodyne(
     indlength < nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
     # perform conditional mapping of Gaussian quantum state
-    result′, a, A = _homodyne_filter(state, indices, angles)
+    result′, a, A = _homodyne_filter(rng, state, indices, angles)
     mean′ = zeros(eltype(Tm), 2*nmodes)
     covar′ = Matrix{eltype(Tc)}((state.ħ/2)*I, 2*nmodes, 2*nmodes)
     # fill in measured modes with vacuum states 
@@ -111,7 +112,8 @@ end
 function homodyne(
     state::GaussianState{<:QuadBlockBasis,Tm,Tc}, 
     indices::R, 
-    angles::G
+    angles::G;
+    rng::AbstractRNG = Random.default_rng()
 ) where {Tm,Tc,R,G}
     basis = state.basis
     nmodes = basis.nmodes
@@ -119,7 +121,7 @@ function homodyne(
     indlength < nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
     # perform conditional mapping of Gaussian quantum state
-    result′, a, A = _homodyne_filter(state, indices, angles)
+    result′, a, A = _homodyne_filter(rng, state, indices, angles)
     mean′ = zeros(eltype(Tm), 2*nmodes)
     covar′ = Matrix{eltype(Tc)}((state.ħ/2)*I, 2*nmodes, 2*nmodes)
     nmodes′ = nmodes - length(indices)
@@ -147,9 +149,11 @@ function homodyne(
     state′ = GaussianState(basis, mean′′, covar′′, ħ = state.ħ)
     return Homodyne(result′, state′)
 end
+homodyne(rng::AbstractRNG, state::GaussianState{<:QuadPairBasis,Tm,Tc}, indices::R, angles::G) where {Tm,Tc,R,G} = homodyne(state, indices, angles; rng = rng)
+homodyne(rng::AbstractRNG, state::GaussianState{<:QuadBlockBasis,Tm,Tc}, indices::R, angles::G) where {Tm,Tc,R,G} = homodyne(state, indices, angles; rng = rng)
 
 """
-    rand(::Type{Homodyne}, state::GaussianState, indices::Vector, angles::Vector; shots = 1) -> Array
+    rand([rng::AbstractRNG], ::Type{Homodyne}, state::GaussianState, indices::Vector, angles::Vector; shots = 1) -> Array
 
 Compute the projection of the subsystem of a Gaussian state `state` indicated by `indices`
 on rotated quadrature states with homodyne phases given by `angles` and return an array of measured modes.
@@ -172,6 +176,17 @@ julia> rand(Homodyne, st, [1, 3], [pi/2, 0], shots = 5)
 ```
 """
 function Base.rand(
+    ::Type{Homodyne}, 
+    state::GaussianState{<:QuadPairBasis,Tm,Tc}, 
+    indices::R, 
+    angles::G; 
+    shots::Int = 1,
+    rng::AbstractRNG = Random.default_rng()
+) where {Tm,Tc,R,G}
+    return Base.rand(rng, Homodyne, state, indices, angles; shots = shots)
+end
+function Base.rand(
+    rng::AbstractRNG,
     ::Type{Homodyne}, 
     state::GaussianState{<:QuadPairBasis,Tm,Tc}, 
     indices::R, 
@@ -216,12 +231,23 @@ function Base.rand(
     buf = zeros(2*indlength)
     results = zeros(2*indlength, shots)
     @inbounds for i in Base.OneTo(shots)
-        mul!(@view(results[:,i]), L, randn!(buf))
+        mul!(@view(results[:,i]), L, randn!(rng, buf))
         @view(results[:,i]) .+= b
     end
     return results
 end
 function Base.rand(
+    ::Type{Homodyne}, 
+    state::GaussianState{<:QuadBlockBasis,Tm,Tc}, 
+    indices::R, 
+    angles::G;
+    shots::Int = 1,
+    rng::AbstractRNG = Random.default_rng()
+) where {Tm,Tc,R,G}
+    return Base.rand(rng, Homodyne, state, indices, angles; shots = shots)
+end
+function Base.rand(
+    rng::AbstractRNG,
     ::Type{Homodyne}, 
     state::GaussianState{<:QuadBlockBasis,Tm,Tc}, 
     indices::R, 
@@ -278,13 +304,14 @@ function Base.rand(
     buf = zeros(2*indlength)
     results = zeros(2*indlength, shots)
     @inbounds for i in Base.OneTo(shots)
-        mul!(@view(results[:,i]), L, randn!(buf))
+        mul!(@view(results[:,i]), L, randn!(rng, buf))
         @view(results[:,i]) .+= b
     end
     return results
 end
 
 function _homodyne_filter(
+    rng::AbstractRNG,
     state::GaussianState{<:QuadPairBasis,Tm,Tc}, 
     indices::R, 
     angles::G
@@ -307,7 +334,7 @@ function _homodyne_filter(
     # Cholesky decomposition of the covariance matrix
     symB = Symmetric(B)
     L = cholesky(symB).L
-    resultmean = L * randn(2*indlength) + b
+    resultmean = L * randn(rng, 2*indlength) + b
     meandiff = resultmean - b
     # conditional mapping (see Serafini's Quantum Continuous Variables textbook for reference)
     buf = C * inv(symB)
@@ -318,6 +345,7 @@ function _homodyne_filter(
     return result′, a, A
 end
 function _homodyne_filter(
+    rng::AbstractRNG,
     state::GaussianState{<:QuadBlockBasis,Tm,Tc}, 
     indices::R, 
     angles::G
@@ -340,7 +368,7 @@ function _homodyne_filter(
     # Cholesky decomposition of the covariance matrix
     symB = Symmetric(B)
     L = cholesky(symB).L
-    resultmean = L * randn(2*indlength) + b
+    resultmean = L * randn(rng, 2*indlength) + b
     meandiff = resultmean - b
     # conditional mapping (see Serafini's Quantum Continuous Variables textbook for reference)
     buf = C * inv(symB)
