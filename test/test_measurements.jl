@@ -72,17 +72,18 @@
 
         @testset "homodyne" begin
             qpairbasis, qblockbasis = QuadPairBasis(1), QuadBlockBasis(1)
-        
+
             for basis in (qpairbasis, qblockbasis)
                 vac = vacuumstate(basis)
                 @test_throws ArgumentError homodyne(vac, [1, 2], [0.0])
                 @test_throws ArgumentError homodyne(vac, [1], [0.0, π/2])
             end
         
+            squeeze = 1e-14
             # simple test case: measuring 1 mode of 2-mode state
             for basis in (QuadPairBasis(2), QuadBlockBasis(2))
                 st = vacuumstate(basis) ⊗ vacuumstate(basis)
-                M = homodyne(st, [1], [0.0])
+                M = homodyne(st, [1], [0.0]; squeeze)
                 @test M isa Homodyne
                 @test M.result isa Vector
                 @test M.state isa GaussianState
@@ -100,8 +101,8 @@
             st_block = changebasis(QuadBlockBasis, st)
             indices = [2, 4]
             angles = [0.0, π/2]
-            @test size(rand(Homodyne, st, indices, angles, shots=10)) == (4, 10)
-            @test size(rand(Homodyne, st_block, indices, angles, shots=7)) == (4, 7)
+            @test size(rand(Homodyne, st, indices, angles; shots=10, squeeze)) == (4, 10)
+            @test size(rand(Homodyne, st_block, indices, angles; shots=7, squeeze)) == (4, 7)
         
             indices = [1, 2]
             rs_qpair = randstate(QuadPairBasis(4))
@@ -155,18 +156,18 @@
             base_state = squeezedstate(QuadPairBasis(2), 0.3, π/4)
             base_state_block = changebasis(QuadBlockBasis, base_state)
 
-            h1 = homodyne(MersenneTwister(seed), base_state, [1], [0.0])
-            h2 = homodyne(MersenneTwister(seed), base_state, [1], [0.0])
+            h1 = homodyne(MersenneTwister(seed), base_state, [1], [0.0]; squeeze)
+            h2 = homodyne(MersenneTwister(seed), base_state, [1], [0.0]; squeeze)
             @test h1.result == h2.result
             @test h1.state == h2.state
 
-            hb1 = homodyne(MersenneTwister(seed), base_state_block, [1], [0.0])
-            hb2 = homodyne(MersenneTwister(seed), base_state_block, [1], [0.0])
+            hb1 = homodyne(MersenneTwister(seed), base_state_block, [1], [0.0]; squeeze)
+            hb2 = homodyne(MersenneTwister(seed), base_state_block, [1], [0.0]; squeeze)
             @test hb1.result == hb2.result
             @test hb1.state == hb2.state
 
-            samples_kw = rand(Homodyne, base_state, [1], [π/2]; shots = 3, rng = MersenneTwister(seed))
-            samples_pos = rand(MersenneTwister(seed), Homodyne, base_state, [1], [π/2]; shots = 3)
+            samples_kw = rand(Homodyne, base_state, [1], [π/2]; shots = 3, rng = MersenneTwister(seed), squeeze)
+            samples_pos = rand(MersenneTwister(seed), Homodyne, base_state, [1], [π/2]; shots = 3, squeeze)
             @test samples_kw == samples_pos
 
             @test_throws ArgumentError rand(Homodyne, rs_qpair, collect(1:5), [0.0])
