@@ -20,6 +20,9 @@ function catstate_even(basis::SymplecticBasis, α::Number; squeeze_params=nothin
     if squeeze_params === nothing
         state_plus = coherentstate(basis, α, ħ=ħ)
         state_minus = coherentstate(basis, -α, ħ=ħ)
+        overlap = exp(-2 * abs2(α))
+        norm_factor = 1 / sqrt(2 * (1 + overlap))
+        
     else
         r, θ = squeeze_params
         squeezed_vac = squeezedstate(basis, r, θ, ħ=ħ) 
@@ -27,9 +30,11 @@ function catstate_even(basis::SymplecticBasis, α::Number; squeeze_params=nothin
         displace_minus = displace(basis, -α, ħ=ħ)
         state_plus = displace_plus * squeezed_vac
         state_minus = displace_minus * squeezed_vac
+        overlap_val = _overlap(state_plus, state_minus)
+        overlap = real(overlap_val) 
+        norm_factor = 1 / sqrt(2 * (1 + overlap))
     end
-    overlap = exp(-2 * abs2(α))
-    norm_factor = 1 / sqrt(2 * (1 + overlap))
+    
     coeffs = [norm_factor, norm_factor]
     states = [state_plus, state_minus]
     return GaussianLinearCombination(basis, coeffs, states)
@@ -56,6 +61,8 @@ function catstate_odd(basis::SymplecticBasis, α::Number; squeeze_params=nothing
     if squeeze_params === nothing
         state_plus = coherentstate(basis, α, ħ=ħ)
         state_minus = coherentstate(basis, -α, ħ=ħ)
+        overlap = exp(-2 * abs2(α))
+        norm_factor = 1 / sqrt(2 * (1 - overlap))
     else
         r, θ = squeeze_params
         squeezed_vac = squeezedstate(basis, r, θ, ħ=ħ)  
@@ -63,14 +70,15 @@ function catstate_odd(basis::SymplecticBasis, α::Number; squeeze_params=nothing
         displace_minus = displace(basis, -α, ħ=ħ)
         state_plus = displace_plus * squeezed_vac
         state_minus = displace_minus * squeezed_vac
+        overlap_val = _overlap(state_plus, state_minus)
+        overlap = real(overlap_val)  
+        norm_factor = 1 / sqrt(2 * (1 - overlap))
     end
-    overlap = exp(-2 * abs2(α))
-    norm_factor = 1 / sqrt(2 * (1 - overlap))
+    
     coeffs = [norm_factor, -norm_factor]
     states = [state_plus, state_minus]
     return GaussianLinearCombination(basis, coeffs, states)
 end
-
 """
     catstate(basis::SymplecticBasis, α::Number, phase::Real=0; squeeze_params=nothing, ħ=2)
 
@@ -93,6 +101,9 @@ function catstate(basis::SymplecticBasis, α::Number, phase::Real=0; squeeze_par
     if squeeze_params === nothing
         state_plus = coherentstate(basis, α, ħ=ħ)
         state_minus = coherentstate(basis, -α, ħ=ħ)
+        overlap = exp(-2 * abs2(α))
+        phase_factor = exp(1im * phase)
+        norm_factor = 1 / sqrt(2 * (1 + real(phase_factor * overlap)))
     else
         r, θ = squeeze_params
         squeezed_vac = squeezedstate(basis, r, θ, ħ=ħ)  
@@ -100,18 +111,18 @@ function catstate(basis::SymplecticBasis, α::Number, phase::Real=0; squeeze_par
         displace_minus = displace(basis, -α, ħ=ħ)
         state_plus = displace_plus * squeezed_vac
         state_minus = displace_minus * squeezed_vac
+        overlap_val = _overlap(state_plus, state_minus)
+        phase_factor = exp(1im * phase)
+        norm_factor = 1 / sqrt(2 * (1 + real(phase_factor * overlap_val)))
     end
-    overlap = exp(-2 * abs2(α))
-    phase_factor = exp(1im * phase)
-    norm_factor = 1 / sqrt(2 * (1 + real(phase_factor * overlap)))
-    coeffs = [norm_factor, norm_factor * phase_factor]
+    coeffs = [norm_factor, norm_factor * exp(1im * phase)]
     if abs(phase - π) < 1e-14 || abs(phase) < 1e-14
         coeffs = real.(coeffs)
     end
+    
     states = [state_plus, state_minus]
     return GaussianLinearCombination(basis, coeffs, states)
 end
-
 """
     gkpstate(basis::SymplecticBasis; lattice=:square, delta=0.1, nmax=5, ħ=2)
 
@@ -322,7 +333,7 @@ function catstate_odd(basis::SymplecticBasis, αs::AbstractVector; squeeze_param
     @inbounds for i in 1:nmodes  
         α = αs[i]
         squeeze_param = squeeze_params === nothing ? nothing : squeeze_params[i]
-        cat = catstate_even(single_mode_basis, α, squeeze_params=squeeze_param, ħ=ħ)
+        cat = catstate_odd(single_mode_basis, α, squeeze_params=squeeze_param, ħ=ħ)
         cat_states[i] = cat  
     end
     result = cat_states[1]
@@ -331,7 +342,6 @@ function catstate_odd(basis::SymplecticBasis, αs::AbstractVector; squeeze_param
     end
     return result
 end
-
 """
     catstate(basis::SymplecticBasis, αs::AbstractVector, phases::AbstractVector=zeros(length(αs)); squeeze_params=nothing, ħ=2)
 
@@ -348,8 +358,9 @@ function catstate(basis::SymplecticBasis, αs::AbstractVector, phases::AbstractV
     cat_states = Vector{GaussianLinearCombination}(undef, nmodes)  
     @inbounds for i in 1:nmodes  
         α = αs[i]
+        phase = phases[i]
         squeeze_param = squeeze_params === nothing ? nothing : squeeze_params[i]
-        cat = catstate_even(single_mode_basis, α, squeeze_params=squeeze_param, ħ=ħ)
+        cat = catstate(single_mode_basis, α, phase, squeeze_params=squeeze_param, ħ=ħ)
         cat_states[i] = cat  
     end
     result = cat_states[1]

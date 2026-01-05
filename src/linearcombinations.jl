@@ -51,10 +51,10 @@ GaussianLinearCombination with 2 terms for 1 mode.
 """
 mutable struct GaussianLinearCombination{B<:SymplecticBasis,C,S}
     basis::B
-    coeffs::Vector{C}
+    coeffs::C 
     states::Vector{S}
     ħ::Number
-    function GaussianLinearCombination(basis::B, coeffs::Vector{C}, states::Vector{S}) where {B<:SymplecticBasis,C,S}
+    function GaussianLinearCombination(basis::B, coeffs::AbstractVector{C}, states::Vector{S}) where {B<:SymplecticBasis,C<:Number,S}                                                   
         length(coeffs) == length(states) || throw(DimensionMismatch("Number of coefficients ($(length(coeffs))) must match number of states ($(length(states)))"))
         isempty(states) && throw(ArgumentError("Cannot create an empty linear combination"))
         ħ = first(states).ħ
@@ -67,7 +67,8 @@ mutable struct GaussianLinearCombination{B<:SymplecticBasis,C,S}
                 throw(ArgumentError("State $i has different ħ: expected $ħ, got $(state.ħ)"))
             end
         end
-        return new{B,C,S}(basis, coeffs, states, ħ)
+        return new{B,typeof(coeffs),S}(basis, coeffs, states, ħ)
+                         
     end
 end
 """
@@ -99,7 +100,7 @@ end
 
 Create a linear combination from separate vectors of coefficients and states.
 """
-function GaussianLinearCombination(coeffs::Vector{<:Number}, states::Vector{<:GaussianState})
+function GaussianLinearCombination(coeffs::AbstractVector{<:Number}, states::Vector{<:GaussianState})
     isempty(states) && throw(ArgumentError("Cannot create an empty linear combination"))
     basis = first(states).basis
     return GaussianLinearCombination(basis, coeffs, states)
@@ -127,10 +128,37 @@ Add two linear combinations of Gaussian states. Both must have the same symplect
 function Base.:+(lc1::GaussianLinearCombination{B}, lc2::GaussianLinearCombination{B}) where {B<:SymplecticBasis}
     lc1.basis == lc2.basis || throw(ArgumentError(SYMPLECTIC_ERROR))
     lc1.ħ == lc2.ħ || throw(ArgumentError(HBAR_ERROR))
-    coeffs = vcat(lc1.coeffs, lc2.coeffs)
-    states = vcat(lc1.states, lc2.states)
+    lc1_has_gpu_states = !isempty(lc1.states) && _is_gpu_array(lc1.states[1].mean)
+    lc2_has_gpu_states = !isempty(lc2.states) && _is_gpu_array(lc2.states[1].mean)
+    promote_to_gpu = lc1_has_gpu_states || lc2_has_gpu_states
+    if promote_to_gpu
+        T = promote_type(eltype(lc1.coeffs), eltype(lc2.coeffs))
+        coeffs1 = Vector{T}(Array(lc1.coeffs))  
+        coeffs2 = Vector{T}(Array(lc2.coeffs))  
+        if lc1_has_gpu_states
+            states1 = lc1.states
+        else
+            precision = T <: Complex ? real(T) : T
+            states1 = [gpu(s, precision = precision) for s in lc1.states]
+        end
+        if lc2_has_gpu_states
+            states2 = lc2.states
+        else
+            precision = T <: Complex ? real(T) : T
+            states2 = [gpu(s, precision = precision) for s in lc2.states]
+        end
+        coeffs = vcat(coeffs1, coeffs2)
+        states = vcat(states1, states2)
+    else
+        T = promote_type(eltype(lc1.coeffs), eltype(lc2.coeffs))
+        coeffs1 = Vector{T}(lc1.coeffs)
+        coeffs2 = Vector{T}(lc2.coeffs)
+        coeffs = vcat(coeffs1, coeffs2)
+        states = vcat(lc1.states, lc2.states)
+    end
     return GaussianLinearCombination(lc1.basis, coeffs, states)
 end
+
 function Base.:+(lc1::GaussianLinearCombination{B1}, lc2::GaussianLinearCombination{B2}) where {B1<:SymplecticBasis,B2<:SymplecticBasis}
     throw(ArgumentError(SYMPLECTIC_ERROR))
 end
@@ -158,7 +186,8 @@ Base.:-(lc::GaussianLinearCombination) = (-1) * lc
 Multiply a linear combination by a scalar from the left.
 """
 function Base.:*(α::Number, lc::GaussianLinearCombination)
-    new_coeffs = α .* lc.coeffs
+    T = promote_type(typeof(α), eltype(lc.coeffs))
+    new_coeffs = Vector{T}(α .* Array(lc.coeffs)) 
     return GaussianLinearCombination(lc.basis, new_coeffs, copy(lc.states))
 end
 """
@@ -173,8 +202,9 @@ Base.:*(lc::GaussianLinearCombination, α::Number) = α * lc
 Multiply a Gaussian state by a scalar to create a linear combination.
 """
 function Base.:*(α::Number, state::GaussianState)
-    coeff_type = promote_type(typeof(α), eltype(state.mean), eltype(state.covar))
-    return GaussianLinearCombination(state.basis, [convert(coeff_type, α)], [state])
+    T = promote_type(typeof(α), eltype(state.mean), eltype(state.covar))
+    coeff_array = Vector{T}([convert(T, α)])  
+    return GaussianLinearCombination(state.basis, coeff_array, [state])
 end
 """
     *(state::GaussianState, α::Number)
@@ -190,9 +220,22 @@ Add two Gaussian states to create a linear combination.
 function Base.:+(state1::GaussianState, state2::GaussianState)
     state1.basis == state2.basis || throw(ArgumentError(SYMPLECTIC_ERROR))
     state1.ħ == state2.ħ || throw(ArgumentError(HBAR_ERROR))
-    coeff_type = promote_type(eltype(state1.mean), eltype(state1.covar), 
-                              eltype(state2.mean), eltype(state2.covar))
-    return GaussianLinearCombination(state1.basis, [one(coeff_type), one(coeff_type)], [state1, state2])
+    state1_gpu = _is_gpu_array(state1.mean)
+    state2_gpu = _is_gpu_array(state2.mean)
+    T = promote_type(eltype(state1.mean), eltype(state1.covar), 
+                     eltype(state2.mean), eltype(state2.covar))
+    coeffs = Vector{T}([one(T), one(T)])
+    if state1_gpu || state2_gpu
+        precision = T <: Complex ? real(T) : T
+        states = [
+            state1_gpu ? state1 : gpu(state1, precision = precision),
+            state2_gpu ? state2 : gpu(state2, precision = precision)
+        ]
+    else
+        states = [state1, state2]
+    end
+    
+    return GaussianLinearCombination(state1.basis, coeffs, states)
 end
 """
     +(state::GaussianState, lc::GaussianLinearCombination)
@@ -202,9 +245,19 @@ Add a Gaussian state to a linear combination.
 function Base.:+(state::GaussianState, lc::GaussianLinearCombination)
     state.basis == lc.basis || throw(ArgumentError(SYMPLECTIC_ERROR))
     state.ħ == lc.ħ || throw(ArgumentError(HBAR_ERROR))
-    coeff_type = promote_type(eltype(state.mean), eltype(state.covar), eltype(lc.coeffs))
-    new_coeffs = vcat(one(coeff_type), convert(Vector{coeff_type}, lc.coeffs))
-    new_states = vcat(state, lc.states)
+    state_gpu = _is_gpu_array(state.mean)
+    lc_has_gpu = !isempty(lc.states) && _is_gpu_array(lc.states[1].mean)
+    T = promote_type(eltype(state.mean), eltype(state.covar), eltype(lc.coeffs))
+    new_coeffs = Vector{T}(vcat([one(T)], Array(lc.coeffs)))
+    if state_gpu || lc_has_gpu
+        precision = T <: Complex ? real(T) : T
+        promoted_state = state_gpu ? state : gpu(state, precision = precision)
+        promoted_states = lc_has_gpu ? lc.states : [gpu(s, precision = precision) for s in lc.states]
+        new_states = vcat([promoted_state], promoted_states)
+    else
+        new_states = vcat([state], lc.states)
+    end
+    
     return GaussianLinearCombination(lc.basis, new_coeffs, new_states)
 end
 """
@@ -215,9 +268,18 @@ Add a linear combination to a Gaussian state.
 function Base.:+(lc::GaussianLinearCombination, state::GaussianState)
     lc.basis == state.basis || throw(ArgumentError(SYMPLECTIC_ERROR))
     lc.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
-    coeff_type = promote_type(eltype(state.mean), eltype(state.covar), eltype(lc.coeffs))
-    new_coeffs = vcat(convert(Vector{coeff_type}, lc.coeffs), one(coeff_type))
-    new_states = vcat(lc.states, state)
+    state_gpu = _is_gpu_array(state.mean)
+    lc_has_gpu = !isempty(lc.states) && _is_gpu_array(lc.states[1].mean)
+    T = promote_type(eltype(state.mean), eltype(state.covar), eltype(lc.coeffs))
+    new_coeffs = Vector{T}(vcat(Array(lc.coeffs), [one(T)]))
+    if state_gpu || lc_has_gpu
+        precision = T <: Complex ? real(T) : T
+        promoted_state = state_gpu ? state : gpu(state, precision = precision)
+        promoted_states = lc_has_gpu ? lc.states : [gpu(s, precision = precision) for s in lc.states]
+        new_states = vcat(promoted_states, [promoted_state])
+    else
+        new_states = vcat(lc.states, [state])
+    end
     return GaussianLinearCombination(lc.basis, new_coeffs, new_states)
 end
 """
@@ -315,44 +377,63 @@ function simplify!(lc::GaussianLinearCombination; atol::Real=1e-14)
     if isempty(lc.coeffs)
         return lc
     end
-    keep_mask = abs.(lc.coeffs) .> atol
+    cpu_coeffs = Vector(Array(lc.coeffs))  
+    lc_has_gpu_states = !isempty(lc.states) && _is_gpu_array(lc.states[1].mean)
+    keep_mask = abs.(cpu_coeffs) .> atol
     if !any(keep_mask)
-        vac = vacuumstate(lc.basis, ħ = lc.ħ)
-        coeff_type = eltype(lc.coeffs)
-        lc.coeffs = [coeff_type(atol)] 
+        vac = _device_aware_vacuum(lc)
+        coeff_type = eltype(cpu_coeffs)
+        lc.coeffs = Vector{coeff_type}([coeff_type(atol)]) 
         lc.states = [vac]
         return lc
     end
-    coeffs = lc.coeffs[keep_mask]
-    states = lc.states[keep_mask]
-    unique_states = Vector{typeof(states[1])}(undef, length(states))
-    combined_coeffs = Vector{eltype(coeffs)}(undef, length(states))
-    n_unique = 0  
-    for (coeff, state) in zip(coeffs, states)
-        existing_idx = findfirst(s -> isapprox(s, state, atol=1e-12), @view(unique_states[1:n_unique]))
+    surviving_coeffs = cpu_coeffs[keep_mask]
+    surviving_states = lc.states[keep_mask] 
+    if isempty(surviving_states)
+        return lc
+    end
+    unique_states = Vector{typeof(surviving_states[1])}()
+    combined_coeffs = Vector{eltype(surviving_coeffs)}()
+    
+    for (coeff, state) in zip(surviving_coeffs, surviving_states)
+        existing_idx = findfirst(unique_states) do existing_state
+            return states_approximately_equal(existing_state, state, 1e-12)
+        end
         if existing_idx === nothing
-            n_unique += 1
-            unique_states[n_unique] = state
-            combined_coeffs[n_unique] = coeff
+            push!(unique_states, state)
+            push!(combined_coeffs, coeff)
         else
             combined_coeffs[existing_idx] += coeff
         end
     end
-    resize!(unique_states, n_unique)
-    resize!(combined_coeffs, n_unique)
     final_mask = abs.(combined_coeffs) .> atol
     if !any(final_mask)
-        vac = vacuumstate(lc.basis, ħ = lc.ħ)
+        vac = _device_aware_vacuum(lc)
         coeff_type = eltype(combined_coeffs)
-        lc.coeffs = [coeff_type(atol)]
+        lc.coeffs = Vector{coeff_type}([coeff_type(atol)]) 
         lc.states = [vac]
     else
-        lc.coeffs = combined_coeffs[final_mask]
+        final_coeffs = combined_coeffs[final_mask]
+        lc.coeffs = Vector{eltype(final_coeffs)}(final_coeffs) 
         lc.states = unique_states[final_mask]
     end
     return lc
 end
 
+"""
+    states_approximately_equal(state1::GaussianState, state2::GaussianState, atol::Real)
+"""
+function states_approximately_equal(state1::GaussianState, state2::GaussianState, atol::Real)
+    state1.basis != state2.basis && return false
+    state1.ħ != state2.ħ && return false
+    try
+        mean_diff = maximum(abs.(Array(state1.mean) .- Array(state2.mean)))
+        covar_diff = maximum(abs.(Array(state1.covar) .- Array(state2.covar)))
+        return mean_diff <= atol && covar_diff <= atol
+    catch e
+        return false
+    end
+end
 function Base.show(io::IO, mime::MIME"text/plain", lc::GaussianLinearCombination)
     basis_name = nameof(typeof(lc.basis))
     nmodes = lc.basis.nmodes
@@ -400,8 +481,22 @@ The unitary is applied to each component state while preserving coefficients.
 function Base.:(*)(op::GaussianUnitary, lc::GaussianLinearCombination)
     op.basis == lc.basis || throw(ArgumentError(ACTION_ERROR))
     op.ħ == lc.ħ || throw(ArgumentError(HBAR_ERROR))
-    new_states = [op * state for state in lc.states]
-    return GaussianLinearCombination(lc.basis, copy(lc.coeffs), new_states)
+    op_gpu = _is_gpu_array(op.disp)
+    lc_gpu = (device(lc) == :gpu)
+    if op_gpu && !lc_gpu
+        T = real(eltype(op.disp))
+        gpu_states = [gpu(s, precision = T) for s in lc.states]
+        new_states = [op * state for state in gpu_states]
+        return GaussianLinearCombination(lc.basis, copy(lc.coeffs), new_states)
+    elseif !op_gpu && lc_gpu
+        T = real(eltype(lc.coeffs))
+        gpu_op = gpu(op, precision = T)
+        new_states = [gpu_op * state for state in lc.states]
+        return GaussianLinearCombination(lc.basis, copy(lc.coeffs), new_states)
+    else
+        new_states = [op * state for state in lc.states]
+        return GaussianLinearCombination(lc.basis, copy(lc.coeffs), new_states)
+    end
 end
 
 """
@@ -413,10 +508,22 @@ The channel is applied to each component state while preserving coefficients.
 function Base.:(*)(op::GaussianChannel, lc::GaussianLinearCombination)
     op.basis == lc.basis || throw(ArgumentError(ACTION_ERROR))
     op.ħ == lc.ħ || throw(ArgumentError(HBAR_ERROR))
-    new_states = [op * state for state in lc.states]
-    return GaussianLinearCombination(lc.basis, copy(lc.coeffs), new_states)
+    op_gpu = _is_gpu_array(op.disp)
+    lc_has_gpu = !isempty(lc.states) && _is_gpu_array(lc.states[1].mean)
+    cpu_coeffs = Vector(Array(lc.coeffs))
+    if op_gpu && !lc_has_gpu
+        T = real(eltype(op.disp))
+        gpu_states = [gpu(s, precision = T) for s in lc.states]
+        new_states = [op * state for state in gpu_states]
+    elseif !op_gpu && lc_has_gpu
+        T = real(eltype(lc.states[1].mean))
+        gpu_op = gpu(op, precision = T)
+        new_states = [gpu_op * state for state in lc.states]
+    else
+        new_states = [op * state for state in lc.states]
+    end
+    return GaussianLinearCombination(lc.basis, cpu_coeffs, new_states)
 end
-
 """
     tensor(::Type{Tc}, ::Type{Ts}, lc1::GaussianLinearCombination, lc2::GaussianLinearCombination)
 
@@ -704,4 +811,38 @@ function entropy_vn(lc::GaussianLinearCombination)
     # A GaussianLinearCombination represents a pure superposition state
     # |ψ⟩ = Σᵢ cᵢ|ψᵢ⟩, so S(ρ) = -Tr(ρ log ρ) = 0
     return 0.0
+end
+
+"""
+    _is_gpu_array(x::AbstractArray)
+
+Check if an array is a GPU array. Extended by CUDA extension.
+"""
+function _is_gpu_array(x::AbstractArray)
+    return false  
+end
+
+"""
+    _device_aware_vacuum(lc::GaussianLinearCombination)
+
+Create a vacuum state on the same device as the linear combination's states.
+"""
+function _device_aware_vacuum(lc::GaussianLinearCombination)
+    vac = vacuumstate(lc.basis, ħ = lc.ħ)
+    if !isempty(lc.states) && _is_gpu_array(lc.states[1].mean)
+        T = real(eltype(lc.states[1].mean))
+        return gpu(vac, precision = T)
+    else
+        return vac
+    end
+end
+
+"""
+    _create_device_array(data, reference_array)
+
+Create array with proper device placement for coefficients.
+"""
+function _create_device_array(data, reference_array)
+    T = eltype(data)
+    return Vector{T}(Array(data))  
 end

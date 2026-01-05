@@ -40,7 +40,14 @@ export
     purity, entropy_vn, fidelity, logarithmic_negativity,
     cross_wigner, cross_wignerchar,
     # additional interface
-    nmodes
+    nmodes,
+    # GPU device management
+    gpu, cpu, device, adapt_device,
+    # optimized hybrid GPU random functions (industry standard approach)
+    randstate_gpu, randunitary_gpu, randchannel_gpu, randsymplectic_gpu,
+    batch_randstate_gpu, batch_randunitary_gpu,
+    #GPU simulation setup
+    random_ensemble_gpu, random_simulation_setup_gpu
     
 include("errors.jl")
 
@@ -74,4 +81,5 @@ include("linearcombinations.jl")
 
 include("nongaussian_states.jl")
 
+include("gpu_convenience.jl")
 end

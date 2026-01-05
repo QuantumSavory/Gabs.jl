@@ -52,6 +52,42 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-docdeploy@v1
         env:
-          GKSwstype: nul # Fix for Plots with GR backend.
+          GKSwstype: nul 
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+  gpu-tests:
+    name: GPU Tests - Julia ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['1.10']  
+    steps:
+      - uses: actions/checkout@v5
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.version }}
+          arch: x64
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+        env:
+          CUDA_TEST: true
+          JULIA_NUM_THREADS: 2
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.10'
+          arch: x64
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - name: Add JET.jl
+        run: julia -e 'using Pkg; Pkg.add("JET")'
+      - uses: julia-actions/julia-runtest@v1
+        env:
+          JET_TEST: true
+          JULIA_NUM_THREADS: 2
