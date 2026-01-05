@@ -324,6 +324,96 @@ function _tensor(op1::GaussianChannel{B1,D1,T1}, op2::GaussianChannel{B2,D2,T2})
     return disp′′, transform′′, noise′′
 end
 
+##
+# Embedding Gaussian channels
+##
+
+"""
+    embed(basis::SymplecticBasis, idx::Int, op::GaussianChannel)
+    embed(basis::SymplecticBasis, indices::Vector{<:Int}, op::GaussianChannel)
+
+Embed a smaller Gaussian channel into a larger symplectic basis. The channel
+acts on the modes specified by `idx`/`indices` and leaves other modes unchanged.
+"""
+function embed(
+    basis::QuadPairBasis, index::Int, op::GaussianChannel{<:QuadPairBasis,D,S}
+) where {D,S}
+    return embed(basis, [index], op)
+end
+function embed(
+    basis::QuadPairBasis, indices::Vector{<:Int}, op::GaussianChannel{<:QuadPairBasis,D,S}
+) where {D,S}
+    @assert length(indices) == op.basis.nmodes "Number of indices must match number of modes in the channel"
+    @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
+
+    total_modes = basis.nmodes
+    sub_modes = op.basis.nmodes
+    disp = zeros(eltype(op.disp), 2 * total_modes)
+    transform = Matrix{eltype(op.transform)}(I, 2 * total_modes, 2 * total_modes)
+    noise = zeros(eltype(op.noise), 2 * total_modes, 2 * total_modes)
+
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx = indices[i]
+        disp[2idx-1] = op.disp[2i-1]
+        disp[2idx] = op.disp[2i]
+    end
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx_i = indices[i]
+        @inbounds for j in Base.OneTo(sub_modes)
+            idx_j = indices[j]
+            transform[2idx_i-1, 2idx_j-1] = op.transform[2i-1, 2j-1]
+            transform[2idx_i-1, 2idx_j] = op.transform[2i-1, 2j]
+            transform[2idx_i, 2idx_j-1] = op.transform[2i, 2j-1]
+            transform[2idx_i, 2idx_j] = op.transform[2i, 2j]
+
+            noise[2idx_i-1, 2idx_j-1] = op.noise[2i-1, 2j-1]
+            noise[2idx_i-1, 2idx_j] = op.noise[2i-1, 2j]
+            noise[2idx_i, 2idx_j-1] = op.noise[2i, 2j-1]
+            noise[2idx_i, 2idx_j] = op.noise[2i, 2j]
+        end
+    end
+    return GaussianChannel(basis, disp, transform, noise; ħ = op.ħ)
+end
+function embed(
+    basis::QuadBlockBasis, index::Int, op::GaussianChannel{<:QuadBlockBasis,D,S}
+) where {D,S}
+    return embed(basis, [index], op)
+end
+function embed(
+    basis::QuadBlockBasis, indices::Vector{<:Int}, op::GaussianChannel{<:QuadBlockBasis,D,S}
+) where {D,S}
+    @assert length(indices) == op.basis.nmodes "Number of indices must match number of modes in the channel"
+    @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
+
+    total_modes = basis.nmodes
+    sub_modes = op.basis.nmodes
+    disp = zeros(eltype(op.disp), 2 * total_modes)
+    transform = Matrix{eltype(op.transform)}(I, 2 * total_modes, 2 * total_modes)
+    noise = zeros(eltype(op.noise), 2 * total_modes, 2 * total_modes)
+
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx = indices[i]
+        disp[idx] = op.disp[i]
+        disp[idx + total_modes] = op.disp[i + sub_modes]
+    end
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx_i = indices[i]
+        @inbounds for j in Base.OneTo(sub_modes)
+            idx_j = indices[j]
+            transform[idx_i, idx_j] = op.transform[i, j]
+            transform[idx_i, idx_j + total_modes] = op.transform[i, j + sub_modes]
+            transform[idx_i + total_modes, idx_j] = op.transform[i + sub_modes, j]
+            transform[idx_i + total_modes, idx_j + total_modes] = op.transform[i + sub_modes, j + sub_modes]
+
+            noise[idx_i, idx_j] = op.noise[i, j]
+            noise[idx_i, idx_j + total_modes] = op.noise[i, j + sub_modes]
+            noise[idx_i + total_modes, idx_j] = op.noise[i + sub_modes, j]
+            noise[idx_i + total_modes, idx_j + total_modes] = op.noise[i + sub_modes, j + sub_modes]
+        end
+    end
+    return GaussianChannel(basis, disp, transform, noise; ħ = op.ħ)
+end
+
 """
     changebasis(::SymplecticBasis, state::GaussianChannel)
 

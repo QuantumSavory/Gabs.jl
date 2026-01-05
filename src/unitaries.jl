@@ -625,6 +625,84 @@ function _tensor(op1::GaussianUnitary{B1,D1,S1}, op2::GaussianUnitary{B2,D2,S2})
     return disp′′, symp′′
 end
 
+##
+# Embedding Gaussian unitaries
+##
+
+"""
+    embed(basis::SymplecticBasis, idx::Int, op::GaussianUnitary)
+    embed(basis::SymplecticBasis, indices::Vector{<:Int}, op::GaussianUnitary)
+
+Embed a smaller Gaussian unitary into a larger symplectic basis. The unitary
+acts on the modes specified by `idx`/`indices` and the identity acts elsewhere.
+"""
+function embed(
+    basis::QuadPairBasis, index::Int, op::GaussianUnitary{<:QuadPairBasis,D,S}
+) where {D,S}
+    return embed(basis, [index], op)
+end
+function embed(
+    basis::QuadPairBasis, indices::Vector{<:Int}, op::GaussianUnitary{<:QuadPairBasis,D,S}
+) where {D,S}
+    @assert length(indices) == op.basis.nmodes "Number of indices must match number of modes in the unitary"
+    @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
+
+    total_modes = basis.nmodes
+    sub_modes = op.basis.nmodes
+    disp = zeros(eltype(op.disp), 2 * total_modes)
+    symp = Matrix{eltype(op.symplectic)}(I, 2 * total_modes, 2 * total_modes)
+
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx = indices[i]
+        disp[2idx-1] = op.disp[2i-1]
+        disp[2idx] = op.disp[2i]
+    end
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx_i = indices[i]
+        @inbounds for j in Base.OneTo(sub_modes)
+            idx_j = indices[j]
+            symp[2idx_i-1, 2idx_j-1] = op.symplectic[2i-1, 2j-1]
+            symp[2idx_i-1, 2idx_j] = op.symplectic[2i-1, 2j]
+            symp[2idx_i, 2idx_j-1] = op.symplectic[2i, 2j-1]
+            symp[2idx_i, 2idx_j] = op.symplectic[2i, 2j]
+        end
+    end
+    return GaussianUnitary(basis, disp, symp; ħ = op.ħ)
+end
+function embed(
+    basis::QuadBlockBasis, index::Int, op::GaussianUnitary{<:QuadBlockBasis,D,S}
+) where {D,S}
+    return embed(basis, [index], op)
+end
+function embed(
+    basis::QuadBlockBasis, indices::Vector{<:Int}, op::GaussianUnitary{<:QuadBlockBasis,D,S}
+) where {D,S}
+    @assert length(indices) == op.basis.nmodes "Number of indices must match number of modes in the unitary"
+    @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
+
+    total_modes = basis.nmodes
+    sub_modes = op.basis.nmodes
+    disp = zeros(eltype(op.disp), 2 * total_modes)
+    symp = Matrix{eltype(op.symplectic)}(I, 2 * total_modes, 2 * total_modes)
+
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx = indices[i]
+        disp[idx] = op.disp[i]
+        disp[idx + total_modes] = op.disp[i + sub_modes]
+    end
+    @inbounds for i in Base.OneTo(sub_modes)
+        idx_i = indices[i]
+        @inbounds for j in Base.OneTo(sub_modes)
+            idx_j = indices[j]
+            symp[idx_i, idx_j] = op.symplectic[i, j]
+            symp[idx_i, idx_j + total_modes] = op.symplectic[i, j + sub_modes]
+            symp[idx_i + total_modes, idx_j] = op.symplectic[i + sub_modes, j]
+            symp[idx_i + total_modes, idx_j + total_modes] = op.symplectic[i + sub_modes, j + sub_modes]
+        end
+    end
+    return GaussianUnitary(basis, disp, symp; ħ = op.ħ)
+end
+
 """
     issymplectic(basis::SymplecticBasis, x::T)
 

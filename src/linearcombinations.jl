@@ -536,6 +536,24 @@ function ptrace(lc::GaussianLinearCombination, indices::AbstractVector{<:Int})
 end
 
 """
+    embed(basis::SymplecticBasis, idx::Int, lc::GaussianLinearCombination)
+    embed(basis::SymplecticBasis, indices::Vector{<:Int}, lc::GaussianLinearCombination)
+
+Embed every state in a `GaussianLinearCombination` into a larger symplectic
+basis while preserving coefficients.
+"""
+function embed(basis::SymplecticBasis, index::Int, lc::GaussianLinearCombination)
+    return embed(basis, [index], lc)
+end
+function embed(basis::SymplecticBasis, indices::Vector{<:Int}, lc::GaussianLinearCombination)
+    @assert length(indices) == lc.basis.nmodes "Number of indices must match number of modes in the linear combination"
+    @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
+
+    embedded_states = [embed(basis, indices, state) for state in lc.states]
+    return GaussianLinearCombination(basis, copy(lc.coeffs), embedded_states)
+end
+
+"""
     cross_wigner(state1::GaussianState, state2::GaussianState, x::AbstractVector)
 
 Compute the off-diagonal Wigner kernel (cross-Wigner function) between two Gaussian states.
