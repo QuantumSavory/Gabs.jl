@@ -1,5 +1,11 @@
 # News
 
+## v1.3.4 - 2026-01-05
+
+- Add optional rng arguments to random methods.
+- Implement embed functions for Gaussian unitaries, channels, and linear combinations.
+- Add finite squeezing keyword argument in the `homodyne`, `Homodyne` interface.
+
 ## v1.3.3 - 2025-12-13
 
 - Replace SymplecticFactorizations.jl as a dependency with SymplecticMatrices.jl.
