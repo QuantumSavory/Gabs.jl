@@ -62,8 +62,6 @@ braunstein2005
 
 ## No-Go Theorems and Fundamental Limitations in Gaussian Quantum Information
 
-The following papers discuss important no-go theorems and fundamental limitations when restricted to Gaussian quantum information.
-
 ```@bibliography
 Pages = []
 Canonical = false
