@@ -72,7 +72,7 @@ eisert2002a
 eisert2002b
 fiurasek2002
 giedke2002
-lund2001
+werner2001
 ```
 
 ## Publications on Gaussian Quantum Measurements
