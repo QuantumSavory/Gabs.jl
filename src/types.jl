@@ -53,6 +53,7 @@ Defines a Gaussian unitary for an N-mode bosonic system over a 2N-dimensional ph
 ## Fields
 
 - `basis`: Symplectic basis for Gaussian unitary.
+- `basis_l`, `basis_r`: For QuantumInterface compatibility; always equal to `basis`.
 - `disp`: The displacement vector of length 2N.
 - `symplectic`: The symplectic matrix of size 2N x 2N.
 - `ħ = 2`: Reduced Planck's constant.
@@ -133,6 +134,7 @@ Defines a Gaussian channel for an N-mode bosonic system over a 2N-dimensional ph
 ## Fields
 
 - `basis`: Symplectic representation for Gaussian channel.
+- `basis_l`, `basis_r`: For QuantumInterface compatibility; always equal to `basis`.
 - `disp`: The displacement vector of length 2N.
 - `transform`: The transformation matrix of size 2N x 2N.
 - `noise`: The noise matrix of size 2N x 2N.
