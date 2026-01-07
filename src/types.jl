@@ -22,7 +22,7 @@ covariance: 2×2 Matrix{Float64}:
  0.0  1.0
 ```
 """
-@kwdef struct GaussianState{B<:SymplecticBasis,M,V} <: StateVector{M,V}
+@kwdef struct GaussianState{B<:SymplecticBasis,M,V} <: StateVector{B,V}
     basis::B
     mean::M
     covar::V
@@ -81,14 +81,16 @@ symplectic: 2×2 Matrix{Float64}:
  0.0  1.0
 ```
 """
-@kwdef struct GaussianUnitary{B<:SymplecticBasis,D,S} <: AbstractOperator{D,S}
+@kwdef struct GaussianUnitary{B<:SymplecticBasis,D,S} <: AbstractOperator{B,B}
     basis::B
+    basis_l::B = basis
+    basis_r::B = basis
     disp::D
     symplectic::S
     ħ::Number = 2
     function GaussianUnitary(b::B, d::D, s::S; ħ::Number = 2) where {B,D,S}
         all(size(s) .== length(d) .== 2*(b.nmodes)) || throw(DimensionMismatch(UNITARY_ERROR))
-        return new{B,D,S}(b, d, s, ħ)
+        return new{B,D,S}(b, b, b, d, s, ħ)
     end
 end
 
@@ -168,15 +170,17 @@ noise: 2×2 Matrix{Float64}:
  4.0   2.0
 ```
 """
-@kwdef struct GaussianChannel{B<:SymplecticBasis,D,T} <: AbstractOperator{D,T}
+@kwdef struct GaussianChannel{B<:SymplecticBasis,D,T} <: AbstractOperator{B,B}
     basis::B
+    basis_l::B = basis
+    basis_r::B = basis
     disp::D
     transform::T
     noise::T
     ħ::Number = 2
     function GaussianChannel(b::B, d::D, t::T, n::T; ħ::Number = 2) where {B,D,T}
         all(length(d) .== size(t) .== size(n) .== 2*(b.nmodes)) || throw(DimensionMismatch(CHANNEL_ERROR))
-        return new{B,D,T}(b, d, t, n, ħ)
+        return new{B,D,T}(b, b, b, d, t, n, ħ)
     end
 end
 
