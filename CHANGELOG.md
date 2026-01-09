@@ -1,5 +1,12 @@
 # News
 
+## Unreleased
+
+- Align `GaussianState`, `GaussianUnitary`, and `GaussianChannel` parameterization with QuantumInterface basis API.
+  - `GaussianState` now subtyped as `StateVector{B,V}` instead of `StateVector{M,V}`.
+  - `GaussianUnitary` and `GaussianChannel` now subtyped as `AbstractOperator{B,B}` instead of `AbstractOperator{D,T}` and `AbstractOperator{D,T}`.
+  - Added `basis_l` and `basis_r` fields to `GaussianUnitary` and `GaussianChannel` for QuantumInterface compatibility; these fields mirror the `basis` field.
+
 ## v1.3.4 - 2026-01-05
 
 - Add optional rng arguments to random methods.
