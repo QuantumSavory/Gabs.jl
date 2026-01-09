@@ -1,5 +1,9 @@
 # News
 
+## Unreleased
+
+- Add `heterodyne` measurement interface for Gaussian states. Heterodyne measurement simultaneously measures both quadratures of one or more modes.
+
 ## v1.3.4 - 2026-01-05
 
 - Add optional rng arguments to random methods.
