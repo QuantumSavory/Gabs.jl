@@ -174,4 +174,102 @@
             @test_throws ArgumentError rand(Homodyne, rs_qblock, collect(1:5), [π/2])
         end        
     end
+
+    @testset "heterodyne" begin
+
+        @testset "heterodyne" begin
+            qpairbasis, qblockbasis = QuadPairBasis(1), QuadBlockBasis(1)
+
+            for basis in (qpairbasis, qblockbasis)
+                vac = vacuumstate(basis)
+                @test_throws ArgumentError heterodyne(vac, [1, 2])
+            end
+        
+            # simple test case: measuring 1 mode of 2-mode state
+            for basis in (QuadPairBasis(2), QuadBlockBasis(2))
+                st = vacuumstate(basis) ⊗ vacuumstate(basis)
+                M = heterodyne(st, [1])
+                @test M isa Heterodyne
+                @test M.result isa Vector{ComplexF64}
+                @test M.state isa GaussianState
+        
+                result, state = M
+                @test result == M.result
+                @test state == M.state
+        
+                # check if measured mode is replaced with vacuum
+                @test isapprox(state.mean[1:2], zeros(2), atol=1e-12)
+                @test isapprox(state.covar[1:2, 1:2], Matrix{Float64}(I,2,2), atol=1e-12)
+            end
+        
+            st = squeezedstate(QuadPairBasis(4), 0.5, π/2)
+            st_block = changebasis(QuadBlockBasis, st)
+            indices = [2, 4]
+            @test size(rand(Heterodyne, st, indices; shots=10)) == (2, 10)
+            @test size(rand(Heterodyne, st_block, indices; shots=7)) == (2, 7)
+        
+            indices = [1, 2]
+            rs_qpair = randstate(QuadPairBasis(4))
+            rs_qblock = changebasis(QuadBlockBasis, rs_qpair)
+            M_qpair = heterodyne(rs_qpair, indices)
+            M_qblock = heterodyne(rs_qblock, indices)
+        
+            # extract analytical conditional update
+            xA, xB, VA, VB, VAB = Gabs._part_state(rs_qpair, indices)
+            B = copy(VB)
+            # add unit-gain vacuum noise for heterodyne (no squeezing)
+            for i in 1:2
+                B[2i-1,2i-1] += 1.0
+                B[2i,2i] += 1.0
+            end
+            L = cholesky(Symmetric(B)).L
+            resultmean = L * randn(4) + xB
+            xA′ = xA .+ VAB * (inv(B) * (resultmean - xB))
+            VA′ = VA .- VAB * (inv(B) * transpose(VAB))
+        
+            nm = 4
+            out_mean = zeros(2nm)
+            notindices = setdiff(1:nm, indices)
+            for i in eachindex(notindices)
+                idx = notindices[i]
+                out_mean[2idx-1:2idx] .= @view(xA′[2i-1:2i])
+            end
+            out_covar = Matrix{Float64}(I, 2nm, 2nm)
+            for i in eachindex(notindices), j in i:length(notindices)
+                idx, jdx = notindices[i], notindices[j]
+                out_covar[2idx-1:2idx, 2jdx-1:2jdx] .= @view(VA′[2i-1:2i, 2j-1:2j])
+                out_covar[2jdx-1:2jdx, 2idx-1:2idx] .= @view(VA′[2j-1:2j, 2i-1:2i])
+            end
+            expected_state = GaussianState(QuadPairBasis(nm), out_mean, out_covar)
+            @test isapprox(M_qpair.state.covar, expected_state.covar, atol=1e-8)
+            @test isapprox(M_qblock.state.covar, changebasis(QuadBlockBasis, expected_state).covar, atol=1e-8)
+        
+            sstatic = vacuumstate(SVector{2}, SMatrix{2,2}, QuadPairBasis(1))
+            statestatic = sstatic ⊗ sstatic ⊗ sstatic ⊗ sstatic
+            hstatic = heterodyne(statestatic, [2])
+            @test (hstatic.state).mean isa SVector && (hstatic.state).covar isa SMatrix
+            @test isequal(hstatic.state.mean[1:2], zeros(2))
+
+            seed = 4242
+            base_state = squeezedstate(QuadPairBasis(2), 0.3, π/4)
+            base_state_block = changebasis(QuadBlockBasis, base_state)
+
+            h1 = heterodyne(MersenneTwister(seed), base_state, [1])
+            h2 = heterodyne(MersenneTwister(seed), base_state, [1])
+            @test h1.result == h2.result
+            @test h1.state == h2.state
+
+            hb1 = heterodyne(MersenneTwister(seed), base_state_block, [1])
+            hb2 = heterodyne(MersenneTwister(seed), base_state_block, [1])
+            @test hb1.result == hb2.result
+            @test hb1.state == hb2.state
+
+            samples_kw = rand(Heterodyne, base_state, [1]; shots = 3, rng = MersenneTwister(seed))
+            samples_pos = rand(MersenneTwister(seed), Heterodyne, base_state, [1]; shots = 3)
+            @test samples_kw == samples_pos
+
+            @test_throws ArgumentError rand(Heterodyne, rs_qpair, collect(1:5))
+            @test_throws ArgumentError rand(Heterodyne, rs_qblock, collect(1:5))
+        end        
+    end
 end
