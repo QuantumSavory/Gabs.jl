@@ -122,6 +122,36 @@
         end
     end
 
+    @testset "embed" begin
+        qpairbasis = QuadPairBasis(1)
+        qblockbasis = QuadBlockBasis(1)
+    
+        α = rand(Float64) + im * randn(Float64)
+        r, θ = rand(Float64), 2π * rand(Float64)
+        n = rand(1:5)
+    
+        for basis in [qpairbasis, qblockbasis]
+            s1 = coherentstate(basis, α)
+            s2 = squeezedstate(basis, r, θ)
+            s3 = thermalstate(basis, n)
+            full_basis = basis ⊕ basis ⊕ basis
+            state = s1 ⊗ s2 ⊗ s3
+    
+            @test embed(full_basis, 1, s1) == s1 ⊗ vacuumstate(basis) ⊗ vacuumstate(basis)
+            @test embed(full_basis, 2, s2) == vacuumstate(basis) ⊗ s2 ⊗ vacuumstate(basis)
+            @test embed(full_basis, 3, s3) == vacuumstate(basis) ⊗ vacuumstate(basis) ⊗ s3
+            @test embed(full_basis, [1,2], s1 ⊗ s2) == s1 ⊗ s2 ⊗ vacuumstate(basis)
+            @test embed(full_basis, [1,3], s1 ⊗ s3) == s1 ⊗ vacuumstate(basis) ⊗ s3
+            @test embed(full_basis, [2,3], s2 ⊗ s3) == vacuumstate(basis) ⊗ s2 ⊗ s3
+
+            @test ptrace(embed(full_basis, 2, s1), [1,3]) == s1
+            @test ptrace(embed(full_basis, [2,3], s1 ⊗ s2), [1]) == s1 ⊗ s2
+    
+            @test_throws AssertionError embed(full_basis, [1,2,3,4], s1 ⊗ s2 ⊗ s3)
+            @test_throws AssertionError embed(full_basis, [1, 2], s1)  # wrong number of modes
+        end
+    end    
+
     @testset "symplectic spectrum" begin
         nmodes = rand(1:5)
         qpairbasis = QuadPairBasis(nmodes)

@@ -474,39 +474,14 @@ blochmessiah
 polar
 ```
 Let's see an example with the Williamson decomposition:
-```julia
-julia> using LinearAlgebra
-
-julia> state = randstate(QuadBlockBasis(1))
-GaussianState for 1 mode.
-  symplectic basis: QuadBlockBasis
-mean: 2-element Vector{Float64}:
- -0.7574999241497772
-  0.2508265276681603
-covariance: 2×2 Matrix{Float64}:
- 0.352188   0.0172204
- 0.0172204  5.78747
-
-julia> F = williamson(state)
-Williamson{Float64, Matrix{Float64}, Vector{Float64}}
-S factor:
-2×2 Matrix{Float64}:
- -2.01346      0.00480559
-  0.00480559  -0.496669
-symplectic spectrum:
-1-element Vector{Float64}:
- 1.4275781708830115
-
-julia> isapprox(Diagonal(repeat(F.spectrum, 2)), F.S * state.covar * F.S', atol = 1e-12)
-true
-
-julia> S, spectrum = F; # destructuring via iteration
-  
-julia> S == F.S && spectrum == F.spectrum
-true
-
-julia> issymplectic(QuadBlockBasis(1), S, atol = 1e-12)
-true
+```@repl; using Gabs
+using Gabs, LinearAlgebra
+state = randstate(QuadBlockBasis(1))
+F = williamson(state)
+isapprox(Diagonal(repeat(F.spectrum, 2)), F.S * state.covar * F.S', atol = 1e-12)
+S, spectrum = F; # destructuring via iteration
+S == F.S && spectrum == F.spectrum
+issymplectic(QuadBlockBasis(1), S, atol = 1e-12)
 ```
 In the last line of code, we used the symplectic check [`issymplectic`](@ref). In general, we can
 check if a state or operator is Gaussian with [`isgaussian`](@ref).

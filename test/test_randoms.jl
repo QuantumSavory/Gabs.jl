@@ -1,5 +1,6 @@
 @testitem "Random objects" begin
     using Gabs
+    using Random
     using StaticArrays
     using LinearAlgebra: eigvals, adjoint
 
@@ -7,13 +8,14 @@
         nmodes = rand(1:5)
         qpairbasis = QuadPairBasis(nmodes)
         qblockbasis = QuadBlockBasis(nmodes)
-        U_qpair = Gabs._rand_unitary(qpairbasis)
-        U_qblock = Gabs._rand_unitary(qblockbasis)
+        rng = Random.default_rng()
+        U_qpair = Gabs._rand_unitary(rng, qpairbasis)
+        U_qblock = Gabs._rand_unitary(rng, qblockbasis)
         @test isapprox(adjoint(U_qpair), inv(U_qpair), atol = 1e-5)
         @test isapprox(adjoint(U_qblock), inv(U_qblock), atol = 1e-5)
 
-        O_qpair = Gabs._rand_orthogonal_symplectic(qpairbasis)
-        O_qblock = Gabs._rand_orthogonal_symplectic(qblockbasis)
+        O_qpair = Gabs._rand_orthogonal_symplectic(rng, qpairbasis)
+        O_qblock = Gabs._rand_orthogonal_symplectic(rng, qblockbasis)
         @test isapprox(O_qpair', inv(O_qpair), atol = 1e-5)
         @test isapprox(O_qblock', inv(O_qblock), atol = 1e-5)
         @test issymplectic(qpairbasis, O_qpair, atol = 1e-5)
@@ -70,6 +72,11 @@
         @test rs_pair.ħ == 2 && rs_block.ħ == 2
         @test isgaussian(rs_pair, atol = 1e-5)
         @test isgaussian(rs_block, atol = 1e-5)
+        cp_rs_pair = copy(rs_pair)
+        cp_rs_block = copy(rs_block)
+        @test cp_rs_pair == rs_pair && cp_rs_block == rs_block
+        @test Gabs.nmodes(rs_pair) == nmodes
+        @test Gabs.nmodes(rs_block) == nmodes
 
         rspure_pair = randstate(qpairbasis, pure = true, ħ = ħ)
         rspure_block = randstate(qblockbasis, pure = true, ħ = ħ)
@@ -146,6 +153,10 @@
         ru = randunitary(qpairbasis, ħ = ħ)
         @test isgaussian(ru, atol = 1e-5)
 
+        cp_ru = copy(ru)
+        @test cp_ru == ru
+        @test Gabs.nmodes(ru) == nmodes
+
         rupassive = randunitary(qpairbasis, passive = true)
         @test rupassive.ħ == 2
         @test isapprox(rupassive.symplectic', inv(rupassive.symplectic), atol = 1e-5)
@@ -187,6 +198,10 @@
         rc = randchannel(qpairbasis, ħ = ħ)
         @test isgaussian(rc, atol = 1e-5)
 
+        cp_rc = copy(rc)
+        @test cp_rc == rc
+        @test Gabs.nmodes(rc) == nmodes
+
         rc_array = randchannel(Array, qpairbasis)
         @test rc_array.ħ == 2
         @test isgaussian(rc_array, atol = 1e-5)
@@ -202,5 +217,30 @@
         rc_static = randchannel(SVector, SMatrix, qpairbasis)
         @test rc_static.ħ == 2
         @test isgaussian(rc_static, atol = 1e-5)
+    end
+
+    @testset "rng control" begin
+        seed = 2026
+        basis = QuadPairBasis(3)
+
+        rs1 = randstate(MersenneTwister(seed), basis)
+        rs2 = randstate(MersenneTwister(seed), basis)
+        @test rs1 == rs2
+
+        rs_kw = randstate(basis; rng = MersenneTwister(seed))
+        rs_pos = randstate(MersenneTwister(seed), basis)
+        @test rs_kw == rs_pos
+
+        ru1 = randunitary(MersenneTwister(seed), basis)
+        ru2 = randunitary(MersenneTwister(seed), basis)
+        @test ru1 == ru2
+
+        rc1 = randchannel(MersenneTwister(seed), basis)
+        rc2 = randchannel(MersenneTwister(seed), basis)
+        @test rc1 == rc2
+
+        S1 = randsymplectic(MersenneTwister(seed), basis)
+        S2 = randsymplectic(MersenneTwister(seed), basis)
+        @test S1 == S2
     end
 end

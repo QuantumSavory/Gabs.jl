@@ -1,5 +1,27 @@
 # News
 
+## v1.3.4 - 2026-01-05
+
+- Add optional rng arguments to random methods.
+- Implement embed functions for Gaussian unitaries, channels, and linear combinations.
+- Add finite squeezing keyword argument in the `homodyne`, `Homodyne` interface.
+
+## v1.3.3 - 2025-12-13
+
+- Replace SymplecticFactorizations.jl as a dependency with SymplecticMatrices.jl.
+- Define `embed` for Gaussian states.
+- Add `homodyne` interface.
+- Add `nmodes` function.
+
+## v1.3.2 - 2025-08-12
+
+- Add `GaussianLinearCombination` interface, with predefined `catstate`, `catstate_even`,
+ `catstate_odd`, and `gkpstate` states.
+
+## v1.3.1 - 2025-07-02
+
+- Bump QuantumInterface compatibility.
+
 ## v1.3.0 - 2025-04-15
 
 - Add seminal papers section to documentation.

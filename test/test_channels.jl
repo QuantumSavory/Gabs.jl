@@ -156,4 +156,47 @@
         c1, c2 = coherentstate(qpairbasis, alpha1), coherentstate(qpairbasis, alpha2)
         @test (d1 ⊗ d2) * (v1 ⊗ v2) == c1 ⊗ c2
     end
+
+    @testset "embed" begin
+        α = rand(ComplexF64)
+        θ = rand(Float64)
+        n = rand(1:5)
+
+        for basis in (QuadPairBasis(1), QuadBlockBasis(1))
+            z = zeros(2 * basis.nmodes, 2 * basis.nmodes)
+            op = displace(basis, α, z)
+            full_basis = basis ⊕ basis ⊕ basis
+
+            s1 = coherentstate(basis, rand())
+            s2 = thermalstate(basis, rand(1:5))
+            s3 = vacuumstate(basis)
+            input_state = s1 ⊗ s2 ⊗ s3
+
+            embedded = embed(full_basis, 3, op)
+            expected = s1 ⊗ s2 ⊗ (op * s3)
+            @test embedded.basis == full_basis
+            @test embedded * input_state == expected
+        end
+
+        for basis in (QuadPairBasis(2), QuadBlockBasis(2))
+            z = zeros(2 * basis.nmodes, 2 * basis.nmodes)
+            single_basis = typeof(basis)(1)
+            op_two = attenuator(basis, θ, n)
+            full_basis = basis ⊕ single_basis
+
+            s1 = coherentstate(single_basis, rand())
+            s2 = thermalstate(single_basis, rand(1:5))
+            s3 = vacuumstate(single_basis)
+            input_state = s1 ⊗ s2 ⊗ s3
+
+            embedded_two = embed(full_basis, [1, 3], op_two)
+            transformed_13 = op_two * (s1 ⊗ s3)
+            result = embedded_two * input_state
+
+            @test ptrace(result, 2) == transformed_13
+            @test ptrace(result, [1, 3]) == s2
+        end
+
+        @test_throws AssertionError embed(QuadPairBasis(3), [1, 2, 3, 4], displace(QuadPairBasis(1), α, zeros(2, 2)))
+    end
 end
