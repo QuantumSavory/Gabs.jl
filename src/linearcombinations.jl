@@ -1,16 +1,14 @@
 """
     GaussianLinearCombination{B<:SymplecticBasis,C,S}
 
-Represents a linear combination of Gaussian objects of the form `Σᵢ cᵢ gᵢ`
-where `cᵢ` are coefficients and `gᵢ` are all Gaussian states, all Gaussian
-unitaries, or all Gaussian channels, sharing the same symplectic basis and `ħ`
-value.
+Represents a linear combination of Gaussian states of the form `Σᵢ cᵢ|ψᵢ⟩` where `cᵢ` are coefficients 
+and `|ψᵢ⟩` are Gaussian states, all sharing the same symplectic basis and `ħ` value.
 
-# Fields
-- `basis::B`: Symplectic basis shared by all components
-- `coeffs::Vector{C}`: Coefficients for the linear combination
-- `states::Vector{S}`: Vector of Gaussian components
-- `ħ::Number`: Reduced Planck's constant (must be same for all components)
+## Fields
+- `basis::B`: Symplectic basis shared by all states
+- `coeffs::Vector{C}`: Complex coefficients for the linear combination  
+- `states::Vector{S}`: Vector of Gaussian states
+- `ħ::Number`: Reduced Planck's constant (must be same for all states)
 
 ## Examples
 
