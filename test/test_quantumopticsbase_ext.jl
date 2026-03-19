@@ -24,6 +24,22 @@
         return normalize!(exp(generator) * QO.fockstate(basis, 0))
     end
 
+    function evolve_with_generator(generator, ket)
+        return normalize!(exp(QO.dense(generator)) * ket)
+    end
+
+    function two_mode_ops(cutoff)
+        mode_basis = QO.FockBasis(cutoff)
+        basis = QO.tensor(mode_basis, mode_basis)
+        a1 = QO.embed(basis, 1, QO.destroy(mode_basis))
+        a2 = QO.embed(basis, 2, QO.destroy(mode_basis))
+        ad1 = QO.embed(basis, 1, QO.create(mode_basis))
+        ad2 = QO.embed(basis, 2, QO.create(mode_basis))
+        n1 = QO.embed(basis, 1, QO.number(mode_basis))
+        n2 = QO.embed(basis, 2, QO.number(mode_basis))
+        return (; basis, mode_basis, a1, a2, ad1, ad2, n1, n2)
+    end
+
     @testset "single-mode states" begin
         repr = QuantumOpticsRepr(8)
         basis = QO.FockBasis(repr.cutoff)
@@ -95,6 +111,79 @@
         epr = normalize!(exp(QO.dense(λ * create1 * create2)) * vacuum)
         @test samestate(express(Gabs.eprstate(Gabs.QuadPairBasis(2), 0.27, 0.0), repr), epr; atol=1e-8)
         @test samestate(express(Gabs.eprstate(Gabs.QuadBlockBasis(2), 0.27, 0.0), repr), epr; atol=1e-8)
+    end
+
+    @testset "operator actions" begin
+        repr = QuantumOpticsRepr(12)
+        ops = two_mode_ops(repr.cutoff)
+        α0 = [0.12 + 0.03im, -0.07 + 0.08im]
+        pair_state = Gabs.coherentstate(Gabs.QuadPairBasis(2), α0)
+        block_state = Gabs.coherentstate(Gabs.QuadBlockBasis(2), α0)
+
+        @test samestate(express(pair_state, repr), express(block_state, repr))
+
+        function check_operator_action(pair_state, block_state, pair_op, block_op, generator; atol=1e-8)
+            quantumoptics_state = express(pair_state, repr)
+            qostate_after_op = evolve_with_generator(generator, quantumoptics_state)
+            @test samestate(express(pair_op * pair_state, repr), qostate_after_op; atol=atol)
+            @test samestate(express(block_op * block_state, repr), qostate_after_op; atol=atol)
+        end
+
+        transmit = 0.2
+        beamsplitter_generator = asin(sqrt(transmit)) * (ops.ad1 * ops.a2 - ops.a1 * ops.ad2)
+        check_operator_action(
+            pair_state,
+            block_state,
+            Gabs.beamsplitter(Gabs.QuadPairBasis(2), transmit),
+            Gabs.beamsplitter(Gabs.QuadBlockBasis(2), transmit),
+            beamsplitter_generator,
+        )
+
+        phases = [0.17, -0.21]
+        phaseshift_generator = -im * (phases[1] * ops.n1 + phases[2] * ops.n2)
+        check_operator_action(
+            pair_state,
+            block_state,
+            Gabs.phaseshift(Gabs.QuadPairBasis(2), phases),
+            Gabs.phaseshift(Gabs.QuadBlockBasis(2), phases),
+            phaseshift_generator,
+        )
+
+        displacement = [0.04 - 0.01im, -0.03 + 0.02im]
+        displacement_generator = displacement[1] * ops.ad1 - conj(displacement[1]) * ops.a1 +
+            displacement[2] * ops.ad2 - conj(displacement[2]) * ops.a2
+        check_operator_action(
+            pair_state,
+            block_state,
+            Gabs.displace(Gabs.QuadPairBasis(2), displacement),
+            Gabs.displace(Gabs.QuadBlockBasis(2), displacement),
+            displacement_generator,
+        )
+
+        squeeze_parameters = [0.05 * exp(0.2im), -0.04im]
+        squeeze_generator = conj(squeeze_parameters[1]) / 2 * ops.a1^2 -
+            squeeze_parameters[1] / 2 * ops.ad1^2 +
+            conj(squeeze_parameters[2]) / 2 * ops.a2^2 -
+            squeeze_parameters[2] / 2 * ops.ad2^2
+        check_operator_action(
+            pair_state,
+            block_state,
+            Gabs.squeeze(Gabs.QuadPairBasis(2), abs.(squeeze_parameters), angle.(squeeze_parameters)),
+            Gabs.squeeze(Gabs.QuadBlockBasis(2), abs.(squeeze_parameters), angle.(squeeze_parameters)),
+            squeeze_generator,
+        )
+
+        twosqueeze_r = 0.05
+        twosqueeze_phase = -0.3
+        twosqueeze_generator = -(twosqueeze_r * exp(im * twosqueeze_phase)) * ops.ad1 * ops.ad2 +
+            (twosqueeze_r * exp(-im * twosqueeze_phase)) * ops.a1 * ops.a2
+        check_operator_action(
+            pair_state,
+            block_state,
+            Gabs.twosqueeze(Gabs.QuadPairBasis(2), twosqueeze_r, twosqueeze_phase),
+            Gabs.twosqueeze(Gabs.QuadBlockBasis(2), twosqueeze_r, twosqueeze_phase),
+            twosqueeze_generator,
+        )
     end
 
     @testset "mixed states are rejected" begin
