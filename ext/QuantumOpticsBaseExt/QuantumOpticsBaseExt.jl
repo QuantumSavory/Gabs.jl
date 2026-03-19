@@ -15,11 +15,11 @@ function _block_moments(state::Gabs.GaussianState{<:Gabs.QuadPairBasis}, ::Type{
     mean = Vector{T}(undef, 2 * nmodes)
     covar = Matrix{T}(undef, 2 * nmodes, 2 * nmodes)
 
-    @inbounds for i in Base.OneTo(nmodes)
+    @inbounds for i in 1:nmodes
         mean[i] = state.mean[2 * i - 1]
         mean[nmodes + i] = state.mean[2 * i]
 
-        for j in Base.OneTo(nmodes)
+        for j in 1:nmodes
             covar[j, i] = state.covar[2 * j - 1, 2 * i - 1]
             covar[nmodes + j, i] = state.covar[2 * j, 2 * i - 1]
             covar[j, nmodes + i] = state.covar[2 * j - 1, 2 * i]
