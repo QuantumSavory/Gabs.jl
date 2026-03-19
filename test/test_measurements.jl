@@ -96,6 +96,22 @@
                 @test isapprox(state.mean[1:2], zeros(2), atol=1e-12)
                 @test isapprox(state.covar[1:2, 1:2], Matrix{Float64}(I,2,2), atol=1e-12)
             end
+
+            for basis in (qpairbasis, qblockbasis)
+                seed = 1234
+                st = coherentstate(basis, 0.3 + 0.2im)
+                h_int = homodyne(MersenneTwister(seed), st, 1, [0.0]; squeeze)
+                h_vec = homodyne(MersenneTwister(seed), st, [1], [0.0]; squeeze)
+                @test h_int.result == h_vec.result
+                @test h_int.state == h_vec.state
+                @test isapprox(h_int.state, vacuumstate(basis), atol = 1e-12)
+                @test_throws ArgumentError ptrace(h_int.state, 1)
+
+                samples_int = rand(MersenneTwister(seed), Homodyne, st, 1, [0.0]; shots = 2, squeeze)
+                samples_vec = rand(MersenneTwister(seed), Homodyne, st, [1], [0.0]; shots = 2, squeeze)
+                @test samples_int == samples_vec
+                @test size(samples_int) == (2, 2)
+            end
         
             st = squeezedstate(QuadPairBasis(4), 0.5, π/2)
             st_block = changebasis(QuadBlockBasis, st)
@@ -172,6 +188,6 @@
 
             @test_throws ArgumentError rand(Homodyne, rs_qpair, collect(1:5), [0.0])
             @test_throws ArgumentError rand(Homodyne, rs_qblock, collect(1:5), [π/2])
-        end        
+        end
     end
 end
