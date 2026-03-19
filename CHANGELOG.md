@@ -1,6 +1,6 @@
 # News
 
-## v1.3.5 - unreleased
+## v1.3.5 - 2026-03-19
 
 - `express(gaussian_state, ::QuantumOpticsRepr)` is now implemented, letting Gabs.jl pure Gaussian states to be converted to Kets from QuantumOptics.jl
 
