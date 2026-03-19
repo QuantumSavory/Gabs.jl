@@ -4,6 +4,10 @@
 
 - Add `heterodyne` measurement interface for Gaussian states. Heterodyne measurement simultaneously measures both quadratures of one or more modes.
 
+## v1.3.6 - 2026-03-19
+
+- Allow `homodyne`, `generaldyne`, and their corresponding `rand(...)` interfaces to measure single-mode Gaussian states.
+
 ## v1.3.5 - 2026-03-19
 
 - `express(gaussian_state, ::QuantumOpticsRepr)` is now implemented, letting Gabs.jl pure Gaussian states to be converted to Kets from QuantumOptics.jl
