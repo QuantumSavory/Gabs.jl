@@ -98,16 +98,17 @@
             end
 
             for basis in (qpairbasis, qblockbasis)
+                seed = 1234
                 st = coherentstate(basis, 0.3 + 0.2im)
-                h_int = homodyne(st, 1, [0.0]; squeeze)
-                h_vec = homodyne(st, [1], [0.0]; squeeze)
+                h_int = homodyne(MersenneTwister(seed), st, 1, [0.0]; squeeze)
+                h_vec = homodyne(MersenneTwister(seed), st, [1], [0.0]; squeeze)
                 @test h_int.result == h_vec.result
                 @test h_int.state == h_vec.state
                 @test isapprox(h_int.state, vacuumstate(basis), atol = 1e-12)
                 @test_throws ArgumentError ptrace(h_int.state, 1)
 
-                samples_int = rand(Homodyne, st, 1, [0.0]; shots = 2, squeeze)
-                samples_vec = rand(Homodyne, st, [1], [0.0]; shots = 2, squeeze)
+                samples_int = rand(MersenneTwister(seed), Homodyne, st, 1, [0.0]; shots = 2, squeeze)
+                samples_vec = rand(MersenneTwister(seed), Homodyne, st, [1], [0.0]; shots = 2, squeeze)
                 @test samples_int == samples_vec
                 @test size(samples_int) == (2, 2)
             end

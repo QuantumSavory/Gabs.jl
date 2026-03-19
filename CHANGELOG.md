@@ -1,5 +1,9 @@
 # News
 
+## v1.3.6 - 2026-03-19
+
+- Allow `homodyne` and `rand(Homodyne, ...)` to measure single-mode Gaussian states while keeping `ptrace` on all modes unsupported.
+
 ## v1.3.5 - 2026-03-19
 
 - `express(gaussian_state, ::QuantumOpticsRepr)` is now implemented, letting Gabs.jl pure Gaussian states to be converted to Kets from QuantumOptics.jl
