@@ -4,6 +4,10 @@
 
 - Add `heterodyne` measurement interface for Gaussian states. Heterodyne measurement simultaneously measures both quadratures of one or more modes.
 
+## v1.3.5 - 2026-03-19
+
+- `express(gaussian_state, ::QuantumOpticsRepr)` is now implemented, letting Gabs.jl pure Gaussian states to be converted to Kets from QuantumOptics.jl
+
 ## v1.3.4 - 2026-01-05
 
 - Add optional rng arguments to random methods.

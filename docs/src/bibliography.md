@@ -60,6 +60,19 @@ wenger2004
 braunstein2005
 ```
 
+## No-Go Theorems and Fundamental Limitations in Gaussian Quantum Information
+
+```@bibliography
+Pages = []
+Canonical = false
+
+eisert2002a
+eisert2002b
+fiurasek2002
+giedke2002
+werner2001
+```
+
 ## Publications on Gaussian Quantum Measurements
 
 ```@bibliography
