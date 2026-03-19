@@ -1,7 +1,7 @@
 name = "Gabs"
 uuid = "0eb812ee-a11f-4f5e-b8d4-bb8a44f06f50"
 authors = ["Andrew Kille"]
-version = "1.3.4"
+version = "1.3.5"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -11,16 +11,19 @@ SymplecticMatrices = "d07eab47-f98b-4620-8fe1-ee63e153d4ef"
 
 [weakdeps]
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+QuantumOpticsBase = "4f57444f-1401-5e15-980d-4471b28d5678"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [extensions]
 MakieExt = "Makie"
+QuantumOpticsBaseExt = "QuantumOpticsBase"
 StaticArraysExt = "StaticArrays"
 
 [compat]
 LinearAlgebra = "1.9"
 Makie = "0.21, 0.22, 0.23, 0.24"
 QuantumInterface = "0.3.7, 0.3.8, 0.4.1"
+QuantumOpticsBase = "0.5"
 Random = "1.9"
 StaticArrays = "1.9.7"
 Symbolics = "6.27.0"
