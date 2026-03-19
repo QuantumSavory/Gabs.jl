@@ -2,7 +2,7 @@
 
 ## v1.3.6 - 2026-03-19
 
-- Allow `homodyne` and `rand(Homodyne, ...)` to measure single-mode Gaussian states.
+- Allow `homodyne`, `generaldyne`, and their corresponding `rand(...)` interfaces to measure single-mode Gaussian states.
 
 ## v1.3.5 - 2026-03-19
 

@@ -24,6 +24,32 @@
             gd2 = generaldyne(cohs, [1, 4], proj = epr)
             @test isapprox(gd2.result, epr, atol = 1e-12)
             @test isapprox(gd2.state, vac ⊗ vac ⊗ coh ⊗ vac, atol = 1e-12)
+
+            single = coherentstate(basis, 0.3 + 0.2im)
+            proj = squeezedstate(basis, 0.4, π / 3)
+            gd_single_int = generaldyne(single, 1; proj)
+            gd_single_vec = generaldyne(single, [1]; proj)
+            @test gd_single_int.result == proj
+            @test gd_single_vec.result == proj
+            @test gd_single_int.state == gd_single_vec.state
+            @test isapprox(gd_single_int.state, vac, atol = 1e-12)
+            @test_throws ArgumentError ptrace(gd_single_int.state, 1)
+
+            gd_rand_int = generaldyne(single, 1)
+            gd_rand_vec = generaldyne(single, [1])
+            @test gd_rand_int.result isa GaussianState
+            @test gd_rand_vec.result isa GaussianState
+            @test gd_rand_int.result.basis == basis
+            @test gd_rand_vec.result.basis == basis
+            @test isapprox(gd_rand_int.result.covar, vac.covar, atol = 1e-12)
+            @test isapprox(gd_rand_vec.result.covar, vac.covar, atol = 1e-12)
+            @test isapprox(gd_rand_int.state, vac, atol = 1e-12)
+            @test isapprox(gd_rand_vec.state, vac, atol = 1e-12)
+
+            samples_int = rand(Generaldyne, single, 1; shots = 2)
+            samples_vec = rand(Generaldyne, single, [1]; shots = 2)
+            @test size(samples_int) == size(samples_vec)
+            @test size(samples_int) == (2, 2)
         end
 
         indices, nmodes = [7, 8, 9, 10], 10
