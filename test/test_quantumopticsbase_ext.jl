@@ -12,11 +12,19 @@
 
     @test Base.get_extension(Gabs, :QuantumOpticsBaseExt) !== nothing
 
+    # This helper keeps only the creation-operator part of the squeezed-vacuum
+    # expansion. It matches the Gaussian-to-Ket construction more closely in a
+    # truncated Fock basis than `QO.squeeze`, which exponentiates truncated
+    # creation/annihilation operators directly.
     function manual_squeezed_state(basis, z)
         λ = -tanh(abs(z)) * exp(im * angle(z))
         return normalize!(exp(QO.dense((λ / 2) * QO.create(basis)^2)) * QO.fockstate(basis, 0))
     end
 
+    # This is the displaced analogue of `manual_squeezed_state`: it rewrites the
+    # displaced squeezed vacuum as a creation-only exponential acting on vacuum.
+    # `QO.displace * QO.squeeze` is still tested below, but its finite-dimensional
+    # matrix exponentials are a bit more sensitive to cutoff effects.
     function manual_displaced_squeezed_state(basis, α, z)
         λ = -tanh(abs(z)) * exp(im * angle(z))
         β = α - λ * conj(α)
@@ -44,6 +52,8 @@
         repr = QuantumOpticsRepr(8)
         basis = QO.FockBasis(repr.cutoff)
         vacuum = QO.fockstate(basis, 0)
+        builtin_squeeze_atol = 1e-3
+        builtin_displaced_squeeze_atol = 1e-2
 
         @test samestate(express(Gabs.vacuumstate(Gabs.QuadPairBasis(1)), repr), vacuum)
         @test samestate(express(Gabs.vacuumstate(Gabs.QuadBlockBasis(1)), repr), vacuum)
@@ -60,22 +70,36 @@
 
         z = 0.35 * exp(0.4im)
         squeezed = manual_squeezed_state(basis, z)
+        builtin_squeezed = QO.squeeze(basis, z) * vacuum
         @test samestate(
             express(Gabs.squeezedstate(Gabs.QuadPairBasis(1), abs(z), angle(z)), repr),
             squeezed,
         )
         @test samestate(
+            express(Gabs.squeezedstate(Gabs.QuadPairBasis(1), abs(z), angle(z)), repr),
+            builtin_squeezed;
+            atol=builtin_squeeze_atol,
+        )
+        @test samestate(
             express(Gabs.squeezedstate(Gabs.QuadBlockBasis(1), abs(z), angle(z)), repr),
             squeezed,
         )
+        @test samestate(
+            express(Gabs.squeezedstate(Gabs.QuadBlockBasis(1), abs(z), angle(z)), repr),
+            builtin_squeezed;
+            atol=builtin_squeeze_atol,
+        )
 
         displaced = manual_displaced_squeezed_state(basis, α, z)
+        builtin_displaced = QO.displace(basis, α) * QO.squeeze(basis, z) * vacuum
         state_pair = Gabs.displace(Gabs.QuadPairBasis(1), α) *
             Gabs.squeezedstate(Gabs.QuadPairBasis(1), abs(z), angle(z))
         state_block = Gabs.displace(Gabs.QuadBlockBasis(1), α) *
             Gabs.squeezedstate(Gabs.QuadBlockBasis(1), abs(z), angle(z))
         @test samestate(express(state_pair, repr), displaced)
         @test samestate(express(state_block, repr), displaced)
+        @test samestate(express(state_pair, repr), builtin_displaced; atol=builtin_displaced_squeeze_atol)
+        @test samestate(express(state_block, repr), builtin_displaced; atol=builtin_displaced_squeeze_atol)
     end
 
     @testset "multi-mode states" begin
@@ -83,6 +107,7 @@
         mode_basis = QO.FockBasis(repr.cutoff)
         basis = QO.tensor(mode_basis, mode_basis)
         vacuum = QO.tensor(QO.fockstate(mode_basis, 0), QO.fockstate(mode_basis, 0))
+        builtin_squeeze_atol = 2e-3
 
         α = [0.2 + 0.1im, -0.15 + 0.3im]
         expected = QO.tensor(QO.coherentstate(mode_basis, α[1]), QO.coherentstate(mode_basis, α[2]))
@@ -94,15 +119,29 @@
             manual_squeezed_state(mode_basis, z[1]),
             manual_squeezed_state(mode_basis, z[2]),
         )
+        builtin_squeezed = QO.tensor(
+            QO.squeeze(mode_basis, z[1]) * QO.fockstate(mode_basis, 0),
+            QO.squeeze(mode_basis, z[2]) * QO.fockstate(mode_basis, 0),
+        )
         @test samestate(
             express(Gabs.squeezedstate(Gabs.QuadPairBasis(2), abs.(z), angle.(z)), repr),
             squeezed;
             atol=1e-9,
         )
         @test samestate(
+            express(Gabs.squeezedstate(Gabs.QuadPairBasis(2), abs.(z), angle.(z)), repr),
+            builtin_squeezed;
+            atol=builtin_squeeze_atol,
+        )
+        @test samestate(
             express(Gabs.squeezedstate(Gabs.QuadBlockBasis(2), abs.(z), angle.(z)), repr),
             squeezed;
             atol=1e-9,
+        )
+        @test samestate(
+            express(Gabs.squeezedstate(Gabs.QuadBlockBasis(2), abs.(z), angle.(z)), repr),
+            builtin_squeezed;
+            atol=builtin_squeeze_atol,
         )
 
         create1 = QO.embed(basis, 1, QO.create(mode_basis))
