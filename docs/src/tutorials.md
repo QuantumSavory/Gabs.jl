@@ -184,10 +184,10 @@ using Gabs, CairoMakie, Random
 basis = QuadPairBasis(1)
 state = squeezedstate(basis, 0.7, π/4)
 
-# Simulate homodyne measurements
+# Simulate homodyne measurements (q quadrature)
 num_samples = 1000
-θ = 0.0 # measurement angle (q quadrature)
-samples = rand(state, θ, num_samples)
+θ = 0.0
+samples = rand(Homodyne, state, θ; shots=num_samples)
 
 # Estimate the mean and variance from samples
 mean_est = mean(samples)
@@ -205,7 +205,7 @@ Colorbar(fig[1,2], hm)
 fig
 ```
 
-This example demonstrates a simple workflow for quantum state tomography in the Gaussian regime. For more advanced or non-Gaussian tomography, see the [manual](@ref Manual) and [API documentation](@ref API).
+This example demonstrates a simple workflow for quantum state tomography in the Gaussian regime. For more advanced or non-Gaussian tomography, see the [manual](@ref Manual).
 
 ## GPU Acceleration
 
