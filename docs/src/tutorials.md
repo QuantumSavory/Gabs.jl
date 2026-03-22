@@ -158,6 +158,7 @@ symplectic: 4×4 Matrix{Num}:
            0            0     -sqrt(τ)  sqrt(1 - τ)
 
 julia> newst = ptrace(op * st, 1);
+
 ```
 
 Use [Latexify](https://github.com/korsbo/Latexify.jl) to render the covariance matrix of `newst` in LaTeX with the command `latexify(newst.covar) |> print`:
@@ -172,6 +173,40 @@ Use [Latexify](https://github.com/korsbo/Latexify.jl) to render the covariance m
 \right]
 \end{equation}
 ```
+
+## Quantum State Tomography
+
+Quantum state tomography is the process of reconstructing a quantum state from measurement data. For continuous-variable (CV) systems, this often involves homodyne measurements and the reconstruction of the Wigner function or the state’s covariance matrix.
+
+Below is a basic example of simulating homodyne measurements and reconstructing the Wigner function for a single-mode Gaussian state using Gabs.jl:
+
+```@example
+using Gabs, CairoMakie, Random
+basis = QuadPairBasis(1)
+state = squeezedstate(basis, 0.7, π/4)
+
+# Simulate homodyne measurements (here, just sample from the quadrature distribution)
+num_samples = 1000
+θ = 0.0 # measurement angle (q quadrature)
+samples = rand(state, θ, num_samples)
+
+# Estimate the mean and variance from samples
+mean_est = mean(samples)
+var_est = var(samples)
+
+# Reconstruct a Gaussian state from estimated parameters
+recon_state = GaussianState(basis, [mean_est, 0.0], [var_est 0.0; 0.0 1/var_est])
+
+# Plot the Wigner function of the reconstructed state
+q, p = collect(-4.0:0.2:4.0), collect(-4.0:0.2:4.0)
+fig = Figure(fontsize=15, size = (375, 300))
+ax = Axis(fig[1,1], xlabel = L"q", ylabel = L"p")
+hm = heatmap!(ax, q, p, recon_state, dist = :wigner, colormap = :viridis)
+Colorbar(fig[1,2], hm)
+fig
+```
+
+This example demonstrates a simple workflow for quantum state tomography in the Gaussian regime. For more advanced or non-Gaussian tomography, see the [manual](@ref Manual) and [API documentation](@ref API).
 
 ## GPU Acceleration
 
