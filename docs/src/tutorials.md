@@ -180,14 +180,14 @@ Quantum state tomography is the process of reconstructing a quantum state from m
 Below is a basic example of simulating homodyne measurements and reconstructing the Wigner function for a single-mode Gaussian state using Gabs.jl:
 
 ```@example
-using Gabs, CairoMakie, Random
+using Gabs, CairoMakie, Random, Statistics
 basis = QuadPairBasis(1)
 state = squeezedstate(basis, 0.7, π/4)
 
 # Simulate homodyne measurements (q quadrature)
 num_samples = 1000
 θ = 0.0
-samples = rand(Homodyne, state, θ; shots=num_samples)
+samples = rand(Homodyne, state, [1], [θ]; shots=num_samples)
 
 # Estimate the mean and variance from samples
 mean_est = mean(samples)
@@ -213,10 +213,10 @@ Gabs.jl can leverage GPU acceleration for certain linear algebra operations by u
 
 Example:
 ```julia
-using CUDA, Gabs
+using CUDA, Gabs, LinearAlgebra
 basis = QuadPairBasis(1)
 mean = CUDA.zeros(2)
-covar = CUDA.eye(2)
+covar = CuMatrix{Float32}(I, 2, 2)
 state = GaussianState(basis, mean, covar)
 ```
 Note: Not all features are guaranteed to be GPU-compatible. For best performance, ensure all arrays in your workflow are on the GPU.
