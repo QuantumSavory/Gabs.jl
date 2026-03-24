@@ -573,7 +573,7 @@ function _thermal_noise(basis::Union{QuadPairBasis{N},QuadBlockBasis{N}}, η::R,
 end
 
 # Internal function for vector parameters - QuadPairBasis (q1, p1, q2, p2...)
-function _thermal_noise(basis::QuadPairBasis{N}, η::R, c::R) where {N<:Int,R<:Vector,M<:Vector}
+function _thermal_noise(basis::QuadPairBasis{N}, η::R, c::R) where {N<:Int,R<:Vector}
     nmodes = basis.nmodes
     Rt = eltype(R)
     disp = zeros(Rt, 2*nmodes) 
@@ -594,7 +594,7 @@ function _thermal_noise(basis::QuadPairBasis{N}, η::R, c::R) where {N<:Int,R<:V
 end
 
 # Internal function for vector parameters - QuadBlockBasis (q1, q2... p1, p2...)
-function _thermal_noise(basis::QuadBlockBasis{N}, η::R, c::R) where {N<:Int,R<:Vector,M<:Vector}
+function _thermal_noise(basis::QuadBlockBasis{N}, η::R, c::R) where {N<:Int,R<:Vector}
     nmodes = basis.nmodes
     Rt = eltype(R)
     disp = zeros(Rt, 2*nmodes) 
