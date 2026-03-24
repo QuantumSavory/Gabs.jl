@@ -220,6 +220,187 @@ function _amplifier(basis::QuadBlockBasis{N}, r::R, n::M) where {N<:Int,R<:Vecto
     return disp, transform, noise
 end
 
+""" 
+    classical_noise([Td=Vector{Float64}, Tt=Matrix{Float64},] basis::SymplecticBasis, n::Union{Int, Vector{Int}})
+    Gaussian channel describing the addition of classical noise to a Gaussian state. The channel is paramatrized
+    by noise parameter `n`, which can be a scalar (same noise on all modes) or a vector (different noise per mode).
+    The action is represented by the zero displacement vector and a noise matrix equal to `n*I'.
+
+    ## Example
+
+basis = QuadPairBasis(2)
+n_scalar = 0.8
+channel_scalar = classical_noise(basis, n_scalar)
+
+    SCALAR NOISE (n = 0.8)
+Displacement:
+4-element Vector{Float64}:
+ 0.0
+ 0.0
+ 0.0
+ 0.0
+
+Transform Matrix:
+4×4 Matrix{Float64}:
+ 1.0  0.0  0.0  0.0
+ 0.0  1.0  0.0  0.0
+ 0.0  0.0  1.0  0.0
+ 0.0  0.0  0.0  1.0
+
+Noise Matrix:
+4×4 Matrix{Float64}:
+ 0.8  0.0  0.0  0.0
+ 0.0  0.8  0.0  0.0
+ 0.0  0.0  0.8  0.0
+ 0.0  0.0  0.0  0.8
+"""
+
+function classical_noise(::Type{Td}, ::Type{Tt}, basis::SymplecticBasis{N}, n::M; ħ = 2) where {Td,Tt,N<:Int,M}
+    disp, transform, noise = _classical_noise(basis, n)
+    return GaussianChannel(basis, Td(disp), Tt(transform), Tt(noise); ħ = ħ)
+end
+
+classical_noise(::Type{T}, basis::SymplecticBasis{N}, n::M; ħ = 2) where {T,N<:Int,M} = classical_noise(T, T, basis, n; ħ = ħ)
+
+function classical_noise(basis::SymplecticBasis{N}, n::M; ħ = 2) where {N<:Int,M}
+    disp, transform, noise = _classical_noise(basis, n)
+    return GaussianChannel(basis, disp, transform, noise; ħ = ħ)
+end
+
+# Internal function for scalar noise (same noise on all modes)
+function _classical_noise(basis::Union{QuadPairBasis{N},QuadBlockBasis{N}}, n::M) where {N<:Int,M}
+    nmodes = basis.nmodes
+    Rt = typeof(float(n))
+    disp = zeros(Rt, 2*nmodes) 
+    transform = Matrix{Rt}(I, 2*nmodes, 2*nmodes) # X = I
+    noise = Matrix{Rt}(n * I, 2*nmodes, 2*nmodes) # Y = n * I
+    return disp, transform, noise
+end
+
+# Internal function for vector noise (different noise per mode) 
+function _classical_noise(basis::QuadPairBasis{N}, n::M) where {N<:Int,M<:Vector}
+    nmodes = basis.nmodes
+    Mt = eltype(M)
+    disp = zeros(Mt, 2*nmodes) 
+    transform = Matrix{Mt}(I, 2*nmodes, 2*nmodes)
+    noise = zeros(Mt, 2*nmodes, 2*nmodes)
+    
+    @inbounds for i in Base.OneTo(nmodes)
+        ni = n[i]
+        noise[2*i-1, 2*i-1] = ni
+        noise[2*i, 2*i]     = ni
+    end
+    return disp, transform, noise
+end
+
+# Internal function for vector noise (different noise per mode)
+function _classical_noise(basis::QuadBlockBasis{N}, n::M) where {N<:Int,M<:Vector}
+    nmodes = basis.nmodes
+    Mt = eltype(M)
+    disp = zeros(Mt, 2*nmodes) 
+    transform = Matrix{Mt}(I, 2*nmodes, 2*nmodes)
+    noise = zeros(Mt, 2*nmodes, 2*nmodes)
+    
+    @inbounds for i in Base.OneTo(nmodes)
+        ni = n[i]
+        noise[i, i]               = ni
+        noise[i+nmodes, i+nmodes] = ni
+    end
+    return disp, transform, noise
+end
+
+"""
+thermal_noise([Td=Vector{Float64}, Tt=Matrix{Float64},] basis::SymplecticBasis, η, c; ħ = 2)
+    Gaussian channel describing the interaction of a Gaussian state with a thermal environment. The channel is parameterized
+    by transmissivity `η` and mean thermal photon number `c`, which can be scalars (same for all modes) or vectors (different per mode).
+    The action is represented by a zero displacement vector, a transformation matrix equal to `sqrt(η)*I`, and a noise matrix equal to `(1-η)*(2c+1)*(ħ/2)*I`.
+    
+    ## Example
+    thermal_channel = thermal_noise(QuadPairBasis(2), 0.8, 0.6)
+    Displacement:
+4-element Vector{Float64}:
+ 0.0
+ 0.0
+ 0.0
+ 0.0
+Transform Matrix:
+4×4 Matrix{Float64}:
+ 0.894427  0.0       0.0       0.0
+ 0.0       0.894427  0.0       0.0
+ 0.0       0.0       0.894427  0.0
+ 0.0       0.0       0.0       0.894427
+Noise Matrix:
+4×4 Matrix{Float64}:
+ 0.12  0.0   0.0   0.0
+ 0.0   0.12  0.0   0.0
+ 0.0   0.0   0.12  0.0
+ 0.0   0.0   0.0   0.12
+"""
+
+function thermal_noise(::Type{Td}, ::Type{Tt}, basis::SymplecticBasis{N}, η::M, c::L; ħ = 2) where {Td,Tt,N<:Int,M,L}
+    disp, transform, noise = _thermal_noise(basis, η, c)
+    return GaussianChannel(basis, Td(disp), Tt(transform), Tt(noise); ħ = ħ)
+end
+
+thermal_noise(::Type{T}, basis::SymplecticBasis{N}, η::M, c::L; ħ = 2) where {T,N<:Int,M,L} = thermal_noise(T, T, basis, η, c; ħ = ħ)
+
+function thermal_noise(basis::SymplecticBasis{N}, η::M, c::L; ħ = 2) where {N<:Int,M,L}
+    disp, transform, noise = _thermal_noise(basis, η, c)
+    return GaussianChannel(basis, disp, transform, noise; ħ = ħ)
+end
+
+# Internal function for scalar parameters 
+function _thermal_noise(basis::Union{QuadPairBasis{N},QuadBlockBasis{N}}, η::R, c::L) where {N<:Int,R,L}
+    nmodes = basis.nmodes
+    Rt = promote_type(typeof(float(η)), typeof(float(c))) 
+    disp = zeros(Rt, 2*nmodes) 
+    transform = Matrix{Rt}(sqrt(η) * I, 2*nmodes, 2*nmodes)
+    noise = Matrix{Rt}((1 - η) * c * I, 2*nmodes, 2*nmodes)
+    return disp, transform, noise
+end
+
+# Internal function for vector parameters 
+function _thermal_noise(basis::QuadPairBasis{N}, η::R, c::R) where {N<:Int,R<:Vector}
+    nmodes = basis.nmodes
+    Rt = eltype(R)
+    disp = zeros(Rt, 2*nmodes) 
+    transform = zeros(Rt, 2*nmodes, 2*nmodes)
+    noise = zeros(Rt, 2*nmodes, 2*nmodes)
+    
+    @inbounds for i in Base.OneTo(nmodes)
+        sqrt_η = sqrt(η[i])
+        noise_val = (1 - η[i]) * c[i]
+        
+        transform[2*i-1, 2*i-1] = sqrt_η
+        transform[2*i, 2*i]     = sqrt_η
+
+        noise[2*i-1, 2*i-1] = noise_val
+        noise[2*i, 2*i]     = noise_val
+    end
+    return disp, transform, noise
+end
+
+# Internal function for vector parameters 
+function _thermal_noise(basis::QuadBlockBasis{N}, η::R, c::R) where {N<:Int,R<:Vector}
+    nmodes = basis.nmodes
+    Rt = eltype(R)
+    disp = zeros(Rt, 2*nmodes) 
+    transform = zeros(Rt, 2*nmodes, 2*nmodes)
+    noise = zeros(Rt, 2*nmodes, 2*nmodes)
+    
+    @inbounds for i in Base.OneTo(nmodes)
+        sqrt_η = sqrt(η[i])
+        noise_val = (1 - η[i]) * c[i]
+
+        transform[i, i]               = sqrt_η
+        transform[i+nmodes, i+nmodes] = sqrt_η
+
+        noise[i, i]               = noise_val
+        noise[i+nmodes, i+nmodes] = noise_val
+    end
+    return disp, transform, noise
+end
+
 ##
 # Predefined operations on Gaussian channels
 ##
@@ -496,120 +677,3 @@ end
 changebasis(::Type{<:QuadBlockBasis}, op::GaussianChannel{<:QuadBlockBasis,D,S}) where {D,S} = op
 changebasis(::Type{<:QuadPairBasis}, op::GaussianChannel{<:QuadPairBasis,D,S}) where {D,S} = op
 
-function classical_noise(::Type{Td}, ::Type{Tt}, basis::SymplecticBasis{N}, n::M; ħ = 2) where {Td,Tt,N<:Int,M}
-    disp, transform, noise = _classical_noise(basis, n)
-    return GaussianChannel(basis, Td(disp), Tt(transform), Tt(noise); ħ = ħ)
-end
-
-classical_noise(::Type{T}, basis::SymplecticBasis{N}, n::M; ħ = 2) where {T,N<:Int,M} = classical_noise(T, T, basis, n; ħ = ħ)
-
-function classical_noise(basis::SymplecticBasis{N}, n::M; ħ = 2) where {N<:Int,M}
-    disp, transform, noise = _classical_noise(basis, n)
-    return GaussianChannel(basis, disp, transform, noise; ħ = ħ)
-end
-
-# Internal function for scalar noise (same noise on all modes)
-function _classical_noise(basis::Union{QuadPairBasis{N},QuadBlockBasis{N}}, n::M) where {N<:Int,M}
-    nmodes = basis.nmodes
-    Rt = typeof(float(n))
-    disp = zeros(Rt, 2*nmodes) 
-    transform = Matrix{Rt}(I, 2*nmodes, 2*nmodes) # X = I
-    noise = Matrix{Rt}(n * I, 2*nmodes, 2*nmodes) # Y = n * I
-    return disp, transform, noise
-end
-
-# Internal function for vector noise (different noise per mode) - QuadPairBasis (q1, p1, q2, p2...)
-function _classical_noise(basis::QuadPairBasis{N}, n::M) where {N<:Int,M<:Vector}
-    nmodes = basis.nmodes
-    Mt = eltype(M)
-    disp = zeros(Mt, 2*nmodes) 
-    transform = Matrix{Mt}(I, 2*nmodes, 2*nmodes)
-    noise = zeros(Mt, 2*nmodes, 2*nmodes)
-    
-    @inbounds for i in Base.OneTo(nmodes)
-        ni = n[i]
-        noise[2*i-1, 2*i-1] = ni
-        noise[2*i, 2*i]     = ni
-    end
-    return disp, transform, noise
-end
-
-# Internal function for vector noise (different noise per mode) - QuadBlockBasis (q1, q2... p1, p2...)
-function _classical_noise(basis::QuadBlockBasis{N}, n::M) where {N<:Int,M<:Vector}
-    nmodes = basis.nmodes
-    Mt = eltype(M)
-    disp = zeros(Mt, 2*nmodes) 
-    transform = Matrix{Mt}(I, 2*nmodes, 2*nmodes)
-    noise = zeros(Mt, 2*nmodes, 2*nmodes)
-    
-    @inbounds for i in Base.OneTo(nmodes)
-        ni = n[i]
-        noise[i, i]               = ni
-        noise[i+nmodes, i+nmodes] = ni
-    end
-    return disp, transform, noise
-end
-
-function thermal_noise(::Type{Td}, ::Type{Tt}, basis::SymplecticBasis{N}, η::M, c::M; ħ = 2) where {Td,Tt,N<:Int,M}
-    disp, transform, noise = _thermal_noise(basis, η, c)
-    return GaussianChannel(basis, Td(disp), Tt(transform), Tt(noise); ħ = ħ)
-end
-
-thermal_noise(::Type{T}, basis::SymplecticBasis{N}, η::M, c::M; ħ = 2) where {T,N<:Int,M} = thermal_noise(T, T, basis, η, c; ħ = ħ)
-
-function thermal_noise(basis::SymplecticBasis{N}, η::M, c::M; ħ = 2) where {N<:Int,M}
-    disp, transform, noise = _thermal_noise(basis, η, c)
-    return GaussianChannel(basis, disp, transform, noise; ħ = ħ)
-end
-
-# Internal function for scalar parameters (same η and c for all modes)
-function _thermal_noise(basis::Union{QuadPairBasis{N},QuadBlockBasis{N}}, η::R, c::R) where {N<:Int,R}
-    nmodes = basis.nmodes
-    Rt = typeof(float(η))
-    disp = zeros(Rt, 2*nmodes) 
-    transform = Matrix{Rt}(sqrt(η) * I, 2*nmodes, 2*nmodes)
-    noise = Matrix{Rt}((1 - η) * c * I, 2*nmodes, 2*nmodes)
-    return disp, transform, noise
-end
-
-# Internal function for vector parameters - QuadPairBasis (q1, p1, q2, p2...)
-function _thermal_noise(basis::QuadPairBasis{N}, η::R, c::R) where {N<:Int,R<:Vector}
-    nmodes = basis.nmodes
-    Rt = eltype(R)
-    disp = zeros(Rt, 2*nmodes) 
-    transform = zeros(Rt, 2*nmodes, 2*nmodes)
-    noise = zeros(Rt, 2*nmodes, 2*nmodes)
-    
-    @inbounds for i in Base.OneTo(nmodes)
-        sqrt_η = sqrt(η[i])
-        noise_val = (1 - η[i]) * c[i]
-        
-        transform[2*i-1, 2*i-1] = sqrt_η
-        transform[2*i, 2*i]     = sqrt_η
-
-        noise[2*i-1, 2*i-1] = noise_val
-        noise[2*i, 2*i]     = noise_val
-    end
-    return disp, transform, noise
-end
-
-# Internal function for vector parameters - QuadBlockBasis (q1, q2... p1, p2...)
-function _thermal_noise(basis::QuadBlockBasis{N}, η::R, c::R) where {N<:Int,R<:Vector}
-    nmodes = basis.nmodes
-    Rt = eltype(R)
-    disp = zeros(Rt, 2*nmodes) 
-    transform = zeros(Rt, 2*nmodes, 2*nmodes)
-    noise = zeros(Rt, 2*nmodes, 2*nmodes)
-    
-    @inbounds for i in Base.OneTo(nmodes)
-        sqrt_η = sqrt(η[i])
-        noise_val = (1 - η[i]) * c[i]
-
-        transform[i, i]               = sqrt_η
-        transform[i+nmodes, i+nmodes] = sqrt_η
-
-        noise[i, i]               = noise_val
-        noise[i+nmodes, i+nmodes] = noise_val
-    end
-    return disp, transform, noise
-end
