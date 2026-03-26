@@ -538,6 +538,87 @@ function _beamsplitter(basis::QuadBlockBasis{N}, transmit::R) where {N<:Int,R<:V
     return disp, symplectic
 end
 
+"""
+    twosum([Tm=Vector{Float64}, Ts=Matrix{Float64}], basis::SymplecticBasis,)
+    twosum([Tm=Vector{Float64}, Ts=Matrix{Float64}], basis::SymplecticBasis, noise::Ts)
+
+Two-mode sum gate is a gaussian operator that displaces one oscillator by an amount determined by the
+position of the other oscillator.This is also an analogue of C-NOT gate The symplectic representation is given by `basis`. `, respectively. Noise can be added to the operation
+with `noise`.
+
+## Mathematical description of a two-sum squeezing operator
+
+A two-mode sum operator `C_SUM` is defined by the position basis operation
+`C_SUM|q₁, q₂⟩ = |q₁, q₁ + q₂⟩`. The operator 
+`C_SUM` is characterized by the zero displacement vector and symplectic
+matrix `[1 0 0 0; 1 1 0 0; 0 0 1 -1; 0 0 0 1]` acting on the `(q₁, q₂, p₁, p₂)` quadratures., 
+## Example
+
+```jldoctest
+julia> twosqueeze(QuadPairBasis(2), 0.25, pi/4)
+GaussianUnitary for 2 modes.
+  symplectic basis: QuadPairBasis
+displacement: 4-element Vector{Float64}:
+ 0.0
+ 0.0
+ 0.0
+ 0.0
+symplectic: 4×4 Matrix{Float64}:
+  1.03141    0.0       -0.178624  -0.178624
+  0.0        1.03141   -0.178624   0.178624
+ -0.178624  -0.178624   1.03141    0.0
+ -0.178624   0.178624   0.0        1.03141
+```
+"""
+function twosum(::Type{Td}, ::Type{Ts}, basis::SymplecticBasis{N},  ħ = 2) where {Td,Ts,N<:Int}
+    disp, symplectic = _twosum(basis, r, theta)
+    return GaussianUnitary(basis, Td(disp), Ts(symplectic); ħ = ħ)
+end
+twosum(::Type{T}, basis::SymplecticBasis{N},  ħ = 2) where {T,N<:Int} = twosum(T, T, basis, ħ = ħ)
+function twosum(basis::SymplecticBasis{N},  ħ = 2) where {N<:Int,R}
+    disp, symplectic = _twosum(basis)
+    return GaussianUnitary(basis, disp, symplectic; ħ = ħ)
+end
+function _twosum(basis::QuadPairBasis{N}) where {N<:Int}
+    nmodes = basis.nmodes
+    disp = zeros(Float64, 2*nmodes)
+    
+    symplectic = zeros(Float64, 2*nmodes, 2*nmodes)
+    @inbounds for i in Base.OneTo(Int(nmodes/2))
+        symplectic[4*i-3, 4*i-3] = 1
+       
+        symplectic[4*i-2, 4*i-2] = 1
+        symplectic[4*i-2, 4*i] = -1
+        
+        symplectic[4*i-1, 4*i-1] = 1
+        symplectic[4*i-1, 4*i-3] = 1
+
+        symplectic[4*i, 4*i] = 1
+    end
+    return disp, symplectic
+end
+
+function _twosum(basis::QuadBlockBasis{N}) where {N<:Int}
+    nmodes = basis.nmodes
+    disp = zeros(Float64, 2*nmodes)
+    
+    symplectic = zeros(Float64, 2*nmodes, 2*nmodes)
+    for i in Base.OneTo(Int(nmodes/2))
+        symplectic[2*i-1, 2*i-1] = 1
+        symplectic[2*i, 2*i-1] = 1
+        symplectic[2*i, 2*i] = 1
+
+
+        symplectic[2*i+nmodes-1, 2*i+nmodes-1] = 1
+        symplectic[2*i+nmodes-1, 2*i+nmodes] = -1
+       
+        symplectic[2*i+nmodes, 2*i+nmodes] = 1
+
+     
+    end
+    return disp, symplectic
+end
+
 ##
 # Operations on Gaussian unitaries
 ##

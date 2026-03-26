@@ -70,6 +70,17 @@
         @test op.ħ == 2 && op_array.ħ == 2 && op_static.ħ == 2
     end
 
+    @testset "two-mode squeeze operator" begin
+        
+        op, op_array, op_static = twosum(2*qpairbasis), twosum(Array, 2*qpairbasis), twosum(SVector{4*nmodes}, SMatrix{4*nmodes,4*nmodes}, 2*qpairbasis)
+        @test op isa GaussianUnitary && op_array isa GaussianUnitary && op_static isa GaussianUnitary
+        @test twosum(2*qblockbasis) == changebasis(QuadBlockBasis, op)
+        @test op.ħ == 2 && op_array.ħ == 2 && op_static.ħ == 2
+
+    end
+
+
+
     @testset "tensor products" begin
         alpha1, alpha2 = rand(ComplexF64), rand(ComplexF64)
         d1, d2 = displace(qpairbasis, alpha1), displace(qpairbasis, alpha2)
