@@ -1,5 +1,9 @@
 # News
 
+## v1.3.7 - 2026-03-26
+- Added "twosum" unitary
+
+
 ## v1.3.6 - 2026-03-19
 
 - Allow `homodyne`, `generaldyne`, and their corresponding `rand(...)` interfaces to measure single-mode Gaussian states.
