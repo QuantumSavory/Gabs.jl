@@ -70,7 +70,7 @@
         @test op.ħ == 2 && op_array.ħ == 2 && op_static.ħ == 2
     end
 
-    @testset "two-mode squeeze operator" begin
+    @testset "two-mode sum operator" begin
         
         op, op_array, op_static = twosum(2*qpairbasis), twosum(Array, 2*qpairbasis), twosum(SVector{4*nmodes}, SMatrix{4*nmodes,4*nmodes}, 2*qpairbasis)
         @test op isa GaussianUnitary && op_array isa GaussianUnitary && op_static isa GaussianUnitary
