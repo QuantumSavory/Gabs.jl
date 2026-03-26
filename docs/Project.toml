@@ -1,5 +1,5 @@
 [deps]
-
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DocumenterCitations = "daee34ce-89f3-4625-b898-19384cb65244"
 Gabs = "0eb812ee-a11f-4f5e-b8d4-bb8a44f06f50"
