@@ -555,7 +555,7 @@ matrix `[1 0 0 0; 1 1 0 0; 0 0 1 -1; 0 0 0 1]` acting on the `(q₁, q₂, p₁,
 ## Example
 
 ```jldoctest
-julia> twosqueeze(QuadPairBasis(2), 0.25, pi/4)
+julia> twosum(QuadPairBasis(2))
 GaussianUnitary for 2 modes.
   symplectic basis: QuadPairBasis
 displacement: 4-element Vector{Float64}:
@@ -564,10 +564,10 @@ displacement: 4-element Vector{Float64}:
  0.0
  0.0
 symplectic: 4×4 Matrix{Float64}:
-  1.03141    0.0       -0.178624  -0.178624
-  0.0        1.03141   -0.178624   0.178624
- -0.178624  -0.178624   1.03141    0.0
- -0.178624   0.178624   0.0        1.03141
+  1.   0.0    0.0   0.0
+  0.0  1.0    0.0   -1.0
+  1.0  0.0    1.0   0.0
+  0.0   0.0   0.0   1.0
 ```
 """
 function twosum(::Type{Td}, ::Type{Ts}, basis::SymplecticBasis{N},  ħ = 2) where {Td,Ts,N<:Int}
