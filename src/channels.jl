@@ -295,7 +295,7 @@ end
 
 # Internal function for vector noise (different noise per mode)
 function _classical_noise(basis::QuadBlockBasis{N}, n::M) where {N<:Int,M<:Vector}
-    nmodes = basis.nmodes
+    nmodes = basis.nmodeS
     Mt = eltype(M)
     disp = zeros(Mt, 2*nmodes) 
     transform = Matrix{Mt}(I, 2*nmodes, 2*nmodes)
