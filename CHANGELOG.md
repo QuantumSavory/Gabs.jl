@@ -1,7 +1,12 @@
 # News
 
-## Unreleased
- - Define `express` for Gaussian states.
+## v1.3.6 - 2026-03-19
+
+- Allow `homodyne`, `generaldyne`, and their corresponding `rand(...)` interfaces to measure single-mode Gaussian states.
+
+## v1.3.5 - 2026-03-19
+
+- `express(gaussian_state, ::QuantumOpticsRepr)` is now implemented, letting Gabs.jl pure Gaussian states to be converted to Kets from QuantumOptics.jl
 
 ## v1.3.4 - 2026-01-05
 
