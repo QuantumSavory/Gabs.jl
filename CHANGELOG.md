@@ -1,5 +1,8 @@
 # News
 
+## Unreleased
+ - Define `express` for Gaussian states.
+
 ## v1.3.4 - 2026-01-05
 
 - Add optional rng arguments to random methods.
