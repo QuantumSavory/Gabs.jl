@@ -1,7 +1,12 @@
 name = "Gabs"
 uuid = "0eb812ee-a11f-4f5e-b8d4-bb8a44f06f50"
+<<<<<<< fix-issue-#59
 version = "1.3.4"
 authors = ["Andrew Kille"]
+=======
+authors = ["Andrew Kille"]
+version = "1.3.6"
+>>>>>>> main
 
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
@@ -16,10 +21,16 @@ TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 
 [weakdeps]
+<<<<<<< fix-issue-#59
+=======
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+QuantumOpticsBase = "4f57444f-1401-5e15-980d-4471b28d5678"
+>>>>>>> main
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [extensions]
 MakieExt = "Makie"
+QuantumOpticsBaseExt = "QuantumOpticsBase"
 StaticArraysExt = "StaticArrays"
 
 [compat]
@@ -28,6 +39,7 @@ LinearAlgebra = "1.9"
 Makie = "0.21, 0.22, 0.23, 0.24"
 Plots = "1.41.6"
 QuantumInterface = "0.3.7, 0.3.8, 0.4.1"
+QuantumOpticsBase = "0.5"
 Random = "1.9"
 StaticArrays = "1.9.7"
 Symbolics = "6.27.0"

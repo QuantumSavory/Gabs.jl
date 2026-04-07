@@ -24,6 +24,32 @@
             gd2 = generaldyne(cohs, [1, 4], proj = epr)
             @test isapprox(gd2.result, epr, atol = 1e-12)
             @test isapprox(gd2.state, vac ⊗ vac ⊗ coh ⊗ vac, atol = 1e-12)
+
+            single = coherentstate(basis, 0.3 + 0.2im)
+            proj = squeezedstate(basis, 0.4, π / 3)
+            gd_single_int = generaldyne(single, 1; proj)
+            gd_single_vec = generaldyne(single, [1]; proj)
+            @test gd_single_int.result == proj
+            @test gd_single_vec.result == proj
+            @test gd_single_int.state == gd_single_vec.state
+            @test isapprox(gd_single_int.state, vac, atol = 1e-12)
+            @test_throws ArgumentError ptrace(gd_single_int.state, 1)
+
+            gd_rand_int = generaldyne(single, 1)
+            gd_rand_vec = generaldyne(single, [1])
+            @test gd_rand_int.result isa GaussianState
+            @test gd_rand_vec.result isa GaussianState
+            @test gd_rand_int.result.basis == basis
+            @test gd_rand_vec.result.basis == basis
+            @test isapprox(gd_rand_int.result.covar, vac.covar, atol = 1e-12)
+            @test isapprox(gd_rand_vec.result.covar, vac.covar, atol = 1e-12)
+            @test isapprox(gd_rand_int.state, vac, atol = 1e-12)
+            @test isapprox(gd_rand_vec.state, vac, atol = 1e-12)
+
+            samples_int = rand(Generaldyne, single, 1; shots = 2)
+            samples_vec = rand(Generaldyne, single, [1]; shots = 2)
+            @test size(samples_int) == size(samples_vec)
+            @test size(samples_int) == (2, 2)
         end
 
         indices, nmodes = [7, 8, 9, 10], 10
@@ -95,6 +121,22 @@
                 # check if measured mode is replaced with vacuum
                 @test isapprox(state.mean[1:2], zeros(2), atol=1e-12)
                 @test isapprox(state.covar[1:2, 1:2], Matrix{Float64}(I,2,2), atol=1e-12)
+            end
+
+            for basis in (qpairbasis, qblockbasis)
+                seed = 1234
+                st = coherentstate(basis, 0.3 + 0.2im)
+                h_int = homodyne(MersenneTwister(seed), st, 1, [0.0]; squeeze)
+                h_vec = homodyne(MersenneTwister(seed), st, [1], [0.0]; squeeze)
+                @test h_int.result == h_vec.result
+                @test h_int.state == h_vec.state
+                @test isapprox(h_int.state, vacuumstate(basis), atol = 1e-12)
+                @test_throws ArgumentError ptrace(h_int.state, 1)
+
+                samples_int = rand(MersenneTwister(seed), Homodyne, st, 1, [0.0]; shots = 2, squeeze)
+                samples_vec = rand(MersenneTwister(seed), Homodyne, st, [1], [0.0]; shots = 2, squeeze)
+                @test samples_int == samples_vec
+                @test size(samples_int) == (2, 2)
             end
         
             st = squeezedstate(QuadPairBasis(4), 0.5, π/2)
@@ -172,6 +214,6 @@
 
             @test_throws ArgumentError rand(Homodyne, rs_qpair, collect(1:5), [0.0])
             @test_throws ArgumentError rand(Homodyne, rs_qblock, collect(1:5), [π/2])
-        end        
+        end
     end
 end
