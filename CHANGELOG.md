@@ -1,5 +1,9 @@
 # News
 
+## Unreleased
+
+- Add `heterodyne` measurement interface for Gaussian states. Heterodyne measurement simultaneously measures both quadratures of one or more modes.
+
 ## v1.3.6 - 2026-03-19
 
 - Allow `homodyne`, `generaldyne`, and their corresponding `rand(...)` interfaces to measure single-mode Gaussian states.
