@@ -1,6 +1,7 @@
 @testitem "Channels" begin
     using Gabs
     using StaticArrays
+    import Gabs: classical_noise, thermal_noise
 
     nmodes = rand(1:5)
     qpairbasis = QuadPairBasis(nmodes)
@@ -198,5 +199,50 @@
         end
 
         @test_throws AssertionError embed(QuadPairBasis(3), [1, 2, 3, 4], displace(QuadPairBasis(1), α, zeros(2, 2)))
+    end
+
+
+@testset "classical noise channel" begin
+        n = rand(1:10)
+        ns = rand(1:10, nmodes)
+        
+        op_pair = classical_noise(qpairbasis, n)
+        op_block = classical_noise(qblockbasis, n)
+        
+        @test op_pair isa GaussianChannel && op_block isa GaussianChannel
+        @test classical_noise(SVector{2*nmodes}, SMatrix{2*nmodes,2*nmodes}, qpairbasis, n) isa GaussianChannel
+        @test classical_noise(Array, qpairbasis, n) isa GaussianChannel
+        
+        @test op_pair == changebasis(QuadPairBasis, op_block) && op_block == changebasis(QuadBlockBasis, op_pair)
+        @test op_pair == changebasis(QuadPairBasis, op_pair) && op_block == changebasis(QuadBlockBasis, op_block)
+        
+        @test classical_noise(qblockbasis, n) == changebasis(QuadBlockBasis, op_pair)
+        @test classical_noise(qblockbasis, ns) == changebasis(QuadBlockBasis, classical_noise(qpairbasis, ns))
+        
+        @test isgaussian(op_pair, atol = 1e-4)
+        @test op_pair.ħ == 2 && op_block.ħ == 2
+    end
+
+    @testset "thermal noise channel" begin
+        eta = rand(Float64)
+        etas = rand(Float64, nmodes)
+        c = rand(1.0:10.0)
+        cs = rand(1.0:10.0, nmodes)
+        
+        op_pair = thermal_noise(qpairbasis, eta, c)
+        op_block = thermal_noise(qblockbasis, eta, c)
+        
+        @test op_pair isa GaussianChannel && op_block isa GaussianChannel
+        @test thermal_noise(SVector{2*nmodes}, SMatrix{2*nmodes,2*nmodes}, qpairbasis, eta, c) isa GaussianChannel
+        @test thermal_noise(Array, qpairbasis, eta, c) isa GaussianChannel
+        
+        @test op_pair == changebasis(QuadPairBasis, op_block) && op_block == changebasis(QuadBlockBasis, op_pair)
+        @test op_pair == changebasis(QuadPairBasis, op_pair) && op_block == changebasis(QuadBlockBasis, op_block)
+        
+        @test thermal_noise(qblockbasis, eta, c) == changebasis(QuadBlockBasis, op_pair)
+        @test thermal_noise(qblockbasis, etas, cs) == changebasis(QuadBlockBasis, thermal_noise(qpairbasis, etas, cs))
+        
+        @test isgaussian(op_pair, atol = 1e-4)
+        @test op_pair.ħ == 2 && op_block.ħ == 2
     end
 end
