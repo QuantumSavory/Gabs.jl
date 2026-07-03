@@ -132,7 +132,7 @@ end
 In-place application of a Gaussian unitary `op` on the mode indices `indices` of a Gaussian state `state`.
 """
 function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::AbstractVector{<:Int}) where {B<:QuadPairBasis,M,V}
-    # op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
+    typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
     quad_indices = collect(Iterators.flatten((2i - 1, 2i) for i in indices))
@@ -143,7 +143,7 @@ function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::Abstr
     return state
 end
 function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::AbstractVector{<:Int}) where {B<:QuadBlockBasis,M,V}
-    # op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
+    typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
     quad_indices = [indices; indices .+ state.basis.nmodes]
