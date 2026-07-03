@@ -142,11 +142,6 @@ function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::Abstr
     @views state.covar[:, quad_indices] .= state.covar[:, quad_indices] * transpose(S)
     return state
 end
-"""
-    apply!(state::GaussianState, op::GaussianUnitary, indices::AbstractVector{<:Int})
-
-In-place application of a Gaussian unitary `op` on the mode indices `indices` of a Gaussian state `state`.
-"""
 function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::AbstractVector{<:Int}) where {B<:QuadBlockBasis,M,V}
     # op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
