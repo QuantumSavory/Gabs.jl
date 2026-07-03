@@ -126,6 +126,38 @@ function apply!(state::GaussianState, op::GaussianUnitary)
     state.covar .= S * state.covar * transpose(S)
     return state
 end
+"""
+    apply!(state::GaussianState, op::GaussianUnitary, indices::AbstractVector{<:Int})
+
+In-place application of a Gaussian unitary `op` on the mode indices `indices` of a Gaussian state `state`.
+"""
+function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::AbstractVector{<:Int}) where {B<:QuadPairBasis,M,V}
+    # op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
+    op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
+    length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
+    quad_indices = collect(Iterators.flatten((2i - 1, 2i) for i in indices))
+    d, S = op.disp, op.symplectic
+    @views state.mean[quad_indices] .= S * state.mean[quad_indices] .+ d
+    @views state.covar[quad_indices, :] .= S * state.covar[quad_indices, :]
+    @views state.covar[:, quad_indices] .= state.covar[:, quad_indices] * transpose(S)
+    return state
+end
+"""
+    apply!(state::GaussianState, op::GaussianUnitary, indices::AbstractVector{<:Int})
+
+In-place application of a Gaussian unitary `op` on the mode indices `indices` of a Gaussian state `state`.
+"""
+function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::AbstractVector{<:Int}) where {B<:QuadBlockBasis,M,V}
+    # op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
+    op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
+    length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
+    quad_indices = [indices; indices .+ state.basis.nmodes]
+    d, S = op.disp, op.symplectic
+    @views state.mean[quad_indices] .= S * state.mean[quad_indices] .+ d
+    @views state.covar[quad_indices, :] .= S * state.covar[quad_indices, :]
+    @views state.covar[:, quad_indices] .= state.covar[:, quad_indices] * transpose(S)
+    return state
+end
 
 """
 Defines a Gaussian channel for an N-mode bosonic system over a 2N-dimensional phase space.
