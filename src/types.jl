@@ -135,7 +135,11 @@ function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::Abstr
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
-    quad_indices = collect(Iterators.flatten((2i - 1, 2i) for i in indices))
+    quad_indices = Vector{Int}(undef, 2length(indices))
+    @inbounds for (k, i) in enumerate(indices)
+        quad_indices[2k-1] = 2i - 1
+        quad_indices[2k]   = 2i
+    end
     d, S = op.disp, op.symplectic
     @views state.mean[quad_indices] .= S * state.mean[quad_indices] .+ d
     @views state.covar[quad_indices, :] .= S * state.covar[quad_indices, :]
@@ -146,7 +150,12 @@ function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::Abstr
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
-    quad_indices = [indices; indices .+ state.basis.nmodes]
+    l = length(indices)
+    quad_indices = Vector{Int}(undef, 2l)
+    @inbounds for (k, i) in enumerate(indices)
+        quad_indices[k]   = i
+        quad_indices[k+l] = i + state.basis.nmodes
+    end
     d, S = op.disp, op.symplectic
     @views state.mean[quad_indices] .= S * state.mean[quad_indices] .+ d
     @views state.covar[quad_indices, :] .= S * state.covar[quad_indices, :]
