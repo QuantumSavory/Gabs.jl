@@ -141,9 +141,24 @@ function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::Abstr
         quad_indices[2k]   = 2i
     end
     d, S = op.disp, op.symplectic
-    @views state.mean[quad_indices] .= S * state.mean[quad_indices] .+ d
-    @views state.covar[quad_indices, :] .= S * state.covar[quad_indices, :]
-    @views state.covar[:, quad_indices] .= state.covar[:, quad_indices] * transpose(S)
+    m = length(quad_indices)
+    n = size(state.covar, 1)
+    mean_sub = @view state.mean[quad_indices]
+    covar_row = @view state.covar[quad_indices, :]
+    covar_col = @view state.covar[:, quad_indices]
+    # single scratch buffer, reused across the three products (reshaped for the column update)
+    buf = similar(state.covar, m, n)
+    buf_vec = @view buf[1:m]
+    # x̄[q] ← S x̄[q] + d
+    mul!(buf_vec, S, mean_sub)
+    mean_sub .= buf_vec .+ d
+    # V[q,:] ← S V[q,:]
+    mul!(buf, S, covar_row)
+    covar_row .= buf
+    # V[:,q] ← V[:,q] Sᵀ (reads the just-updated V[q,q] block)
+    buf_col = reshape(buf, n, m)
+    mul!(buf_col, covar_col, transpose(S))
+    covar_col .= buf_col
     return state
 end
 function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::AbstractVector{<:Int}) where {B<:QuadBlockBasis,M,V}
@@ -157,9 +172,24 @@ function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::Abstr
         quad_indices[k+l] = i + state.basis.nmodes
     end
     d, S = op.disp, op.symplectic
-    @views state.mean[quad_indices] .= S * state.mean[quad_indices] .+ d
-    @views state.covar[quad_indices, :] .= S * state.covar[quad_indices, :]
-    @views state.covar[:, quad_indices] .= state.covar[:, quad_indices] * transpose(S)
+    m = length(quad_indices)
+    n = size(state.covar, 1)
+    mean_sub = @view state.mean[quad_indices]
+    covar_row = @view state.covar[quad_indices, :]
+    covar_col = @view state.covar[:, quad_indices]
+    # single scratch buffer, reused across the three products (reshaped for the column update)
+    buf = similar(state.covar, m, n)
+    buf_vec = @view buf[1:m]
+    # x̄[q] ← S x̄[q] + d
+    mul!(buf_vec, S, mean_sub)
+    mean_sub .= buf_vec .+ d
+    # V[q,:] ← S V[q,:]
+    mul!(buf, S, covar_row)
+    covar_row .= buf
+    # V[:,q] ← V[:,q] Sᵀ (reads the just-updated V[q,q] block)
+    buf_col = reshape(buf, n, m)
+    mul!(buf_col, covar_col, transpose(S))
+    covar_col .= buf_col
     return state
 end
 
