@@ -126,6 +126,72 @@ function apply!(state::GaussianState, op::GaussianUnitary)
     state.covar .= S * state.covar * transpose(S)
     return state
 end
+"""
+    apply!(state::GaussianState, op::GaussianUnitary, indices::AbstractVector{<:Int})
+
+In-place application of a Gaussian unitary `op` on the mode indices `indices` of a Gaussian state `state`.
+"""
+function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::AbstractVector{<:Int}) where {B<:QuadPairBasis,M,V}
+    typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
+    op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
+    length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
+    quad_indices = Vector{Int}(undef, 2length(indices))
+    @inbounds for (k, i) in enumerate(indices)
+        quad_indices[2k-1] = 2i - 1
+        quad_indices[2k]   = 2i
+    end
+    d, S = op.disp, op.symplectic
+    m = length(quad_indices)
+    n = size(state.covar, 1)
+    mean_sub = @view state.mean[quad_indices]
+    covar_row = @view state.covar[quad_indices, :]
+    covar_col = @view state.covar[:, quad_indices]
+    # single scratch buffer, reused across the three products (reshaped for the column update)
+    buf = similar(state.covar, m, n)
+    buf_vec = @view buf[1:m]
+    # x̄[q] ← S x̄[q] + d
+    mul!(buf_vec, S, mean_sub)
+    mean_sub .= buf_vec .+ d
+    # V[q,:] ← S V[q,:]
+    mul!(buf, S, covar_row)
+    covar_row .= buf
+    # V[:,q] ← V[:,q] Sᵀ (reads the just-updated V[q,q] block)
+    buf_col = reshape(buf, n, m)
+    mul!(buf_col, covar_col, transpose(S))
+    covar_col .= buf_col
+    return state
+end
+function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::AbstractVector{<:Int}) where {B<:QuadBlockBasis,M,V}
+    typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
+    op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
+    length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
+    l = length(indices)
+    quad_indices = Vector{Int}(undef, 2l)
+    @inbounds for (k, i) in enumerate(indices)
+        quad_indices[k]   = i
+        quad_indices[k+l] = i + state.basis.nmodes
+    end
+    d, S = op.disp, op.symplectic
+    m = length(quad_indices)
+    n = size(state.covar, 1)
+    mean_sub = @view state.mean[quad_indices]
+    covar_row = @view state.covar[quad_indices, :]
+    covar_col = @view state.covar[:, quad_indices]
+    # single scratch buffer, reused across the three products (reshaped for the column update)
+    buf = similar(state.covar, m, n)
+    buf_vec = @view buf[1:m]
+    # x̄[q] ← S x̄[q] + d
+    mul!(buf_vec, S, mean_sub)
+    mean_sub .= buf_vec .+ d
+    # V[q,:] ← S V[q,:]
+    mul!(buf, S, covar_row)
+    covar_row .= buf
+    # V[:,q] ← V[:,q] Sᵀ (reads the just-updated V[q,q] block)
+    buf_col = reshape(buf, n, m)
+    mul!(buf_col, covar_col, transpose(S))
+    covar_col .= buf_col
+    return state
+end
 
 """
 Defines a Gaussian channel for an N-mode bosonic system over a 2N-dimensional phase space.

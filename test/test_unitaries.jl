@@ -141,9 +141,11 @@
             embedded_two = embed(full_basis, [1, 3], op_two)
             transformed_13 = op_two * (s1 ⊗ s3)
             result = embedded_two * input_state
+            inplace_13 = apply!(input_state, op_two, [1, 3])
 
             @test ptrace(result, 2) == transformed_13
             @test ptrace(result, [1, 3]) == s2
+            @test result == inplace_13
         end
 
         @test_throws AssertionError embed(QuadPairBasis(3), [1, 2, 3, 4], displace(QuadPairBasis(1), α))
