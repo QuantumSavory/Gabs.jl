@@ -39,6 +39,7 @@ function main()
 
     deploydocs(
         repo = "github.com/QuantumSavory/Gabs.jl.git",
+        devbranch = "main",
         push_preview = true,
     )
 end
