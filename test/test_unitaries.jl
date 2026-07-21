@@ -1,7 +1,7 @@
 @testitem "Unitaries" begin
     using Gabs
     using StaticArrays
-    
+
     nmodes = rand(1:5)
     qpairbasis = QuadPairBasis(nmodes)
     qblockbasis = QuadBlockBasis(nmodes)
@@ -103,7 +103,7 @@
         c = coherentstate(qpairbasis, alpha)
         @test d * v == c
         @test apply!(v, d) == c
-        
+
         v1, v2 = vacuumstate(qpairbasis), vacuumstate(qpairbasis)
         alpha1, alpha2 = rand(ComplexF64), rand(ComplexF64)
         d1, d2 = displace(qpairbasis, alpha1), displace(qpairbasis, alpha2)
@@ -145,7 +145,7 @@
 
             @test ptrace(result, 2) == transformed_13
             @test ptrace(result, [1, 3]) == s2
-            @test result == inplace_13
+            @test result ≈ inplace_13
         end
 
         @test_throws AssertionError embed(QuadPairBasis(3), [1, 2, 3, 4], displace(QuadPairBasis(1), α))

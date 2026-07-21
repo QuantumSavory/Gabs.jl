@@ -57,7 +57,7 @@ giedke2002
 grosshans2002
 giedke2003
 wenger2004
-braunstein2005
+braunstein2005squeezing
 ```
 
 ## No-Go Theorems and Fundamental Limitations in Gaussian Quantum Information
