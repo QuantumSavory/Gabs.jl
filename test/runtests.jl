@@ -1,21 +1,25 @@
 using TestItemRunner
-using Gabs
 
-# filter for the test
-testfilter = ti -> begin
-  exclude = Symbol[:jet]
-  if !(VERSION >= v"1.10")
-    push!(exclude, :doctests)
-    push!(exclude, :aqua)                                 
-  end
+if ARGS == ["jet"]
+    using Pkg
 
-  return all(!in(exclude), ti.tags)
-end
+    Pkg.activate(joinpath(@__DIR__, "projects", "jet"))
+    Pkg.instantiate()
+    include("jet_tests.jl")
+else
+    using Gabs
 
-println("Starting tests with $(Threads.nthreads()) threads out of `Sys.CPU_THREADS = $(Sys.CPU_THREADS)`...")
+    testfilter = ti -> begin
+        exclude = Symbol[:jet]
+        if !(VERSION >= v"1.10")
+            push!(exclude, :doctests)
+            push!(exclude, :aqua)
+        end
 
-@run_package_tests filter=testfilter
+        return all(!in(exclude), ti.tags)
+    end
 
-if get(ENV,"JET_TEST","")=="true"
-    @run_package_tests filter=(ti -> :jet in ti.tags)
+    println("Starting tests with $(Threads.nthreads()) threads out of `Sys.CPU_THREADS = $(Sys.CPU_THREADS)`...")
+
+    @run_package_tests filter=testfilter
 end
