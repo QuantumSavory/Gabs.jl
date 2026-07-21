@@ -15,18 +15,33 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ['1.10']
+        version: ['1.12']
     steps:
       - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v3
         with:
           version: ${{ matrix.version }}
-      - uses: cjdoris/julia-downgrade-compat-action@v1
+      - name: Disable workspace directives for downgrade run
+        run: |
+          julia --color=yes -e '
+            using TOML
+            project = TOML.parsefile("Project.toml")
+            if haskey(project, "workspace")
+              delete!(project, "workspace")
+              open("Project.toml", "w") do io
+                TOML.print(io, project)
+              end
+            end
+          '
+      - uses: julia-actions/julia-downgrade-compat@v2
         with:
           skip: Pkg,TOML,InteractiveUtils,Random,LinearAlgebra
+          mode: deps
+          julia_version: ${{ matrix.version }}
       - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         with:
           allow_reresolve: false
           force_latest_compatible_version: false
+          test_args: general
