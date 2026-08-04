@@ -126,6 +126,10 @@
             expected = s1 ⊗ (op * s2) ⊗ s3
             @test embedded.basis == full_basis
             @test embedded * input_state == expected
+
+            inplace_state = copy(input_state)
+            @test apply!(inplace_state, 2, op) === inplace_state
+            @test inplace_state ≈ expected
         end
 
         for basis in (QuadPairBasis(2), QuadBlockBasis(2))
@@ -141,11 +145,19 @@
             embedded_two = embed(full_basis, [1, 3], op_two)
             transformed_13 = op_two * (s1 ⊗ s3)
             result = embedded_two * input_state
-            inplace_13 = apply!(input_state, op_two, [1, 3])
+            inplace_13 = apply!(input_state, [1, 3], op_two)
 
             @test ptrace(result, 2) == transformed_13
             @test ptrace(result, [1, 3]) == s2
             @test result ≈ inplace_13
+            @test inplace_13 === input_state
+
+            if basis isa QuadPairBasis
+                legacy_state = s1 ⊗ s2 ⊗ s3
+                legacy_13 = @test_deprecated apply!(legacy_state, op_two, [1, 3])
+                @test legacy_13 === legacy_state
+                @test legacy_13 ≈ result
+            end
         end
 
         @test_throws AssertionError embed(QuadPairBasis(3), [1, 2, 3, 4], displace(QuadPairBasis(1), α))

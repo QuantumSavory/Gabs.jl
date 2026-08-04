@@ -127,11 +127,20 @@ function apply!(state::GaussianState, op::GaussianUnitary)
     return state
 end
 """
-    apply!(state::GaussianState, op::GaussianUnitary, indices::AbstractVector{<:Int})
+    apply!(state::GaussianState, index::Int, op::GaussianUnitary)
+    apply!(state::GaussianState, indices::AbstractVector{<:Int}, op::GaussianUnitary)
 
-In-place application of a Gaussian unitary `op` on the mode indices `indices` of a Gaussian state `state`.
+In-place application of a Gaussian unitary `op` on the mode index or indices of a
+Gaussian state `state`.
 """
-function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::AbstractVector{<:Int}) where {B<:QuadPairBasis,M,V}
+function apply!(state::GaussianState, index::Int, op::GaussianUnitary)
+    return apply!(state, [index], op)
+end
+function apply!(
+    state::GaussianState{B,M,V},
+    indices::AbstractVector{<:Int},
+    op::GaussianUnitary,
+) where {B<:QuadPairBasis,M,V}
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
@@ -161,7 +170,11 @@ function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::Abstr
     covar_col .= buf_col
     return state
 end
-function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::AbstractVector{<:Int}) where {B<:QuadBlockBasis,M,V}
+function apply!(
+    state::GaussianState{B,M,V},
+    indices::AbstractVector{<:Int},
+    op::GaussianUnitary,
+) where {B<:QuadBlockBasis,M,V}
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
@@ -192,6 +205,15 @@ function apply!(state::GaussianState{B,M,V}, op::GaussianUnitary, indices::Abstr
     covar_col .= buf_col
     return state
 end
+
+Base.@deprecate(
+    apply!(
+        state::GaussianState,
+        op::GaussianUnitary,
+        indices::AbstractVector{<:Int},
+    ),
+    apply!(state, indices, op)
+)
 
 """
 Defines a Gaussian channel for an N-mode bosonic system over a 2N-dimensional phase space.
@@ -280,8 +302,11 @@ function Base.:(*)(op::GaussianChannel, state::GaussianState)
 end
 """
     apply!(state::GaussianState, op::GaussianChannel)
+    apply!(state::GaussianState, index::Int, op::GaussianChannel)
+    apply!(state::GaussianState, indices::AbstractVector{<:Int}, op::GaussianChannel)
 
-In-place application of a Gaussian channel `op` on a Gaussian state `state`.
+In-place application of a Gaussian channel `op` on all or selected modes of a
+Gaussian state `state`.
 """
 function apply!(state::GaussianState, op::GaussianChannel)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
@@ -290,6 +315,17 @@ function apply!(state::GaussianState, op::GaussianChannel)
     state.mean .= T * state.mean .+ d
     state.covar .= T * state.covar * transpose(T) .+ N
     return state
+end
+function apply!(state::GaussianState, index::Int, op::GaussianChannel)
+    return apply!(state, [index], op)
+end
+function apply!(
+    state::GaussianState,
+    indices::AbstractVector{<:Int},
+    op::GaussianChannel,
+)
+    embedded_op = embed(state.basis, collect(indices), op)
+    return apply!(state, embedded_op)
 end
 
 """

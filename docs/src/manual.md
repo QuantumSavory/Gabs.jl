@@ -188,6 +188,9 @@ covariance: 4×4 Matrix{Float64}:
  0.0      0.0      0.0      1.24483
 ```
 
+To apply a Gaussian unitary or channel to selected modes, place the mode index or
+indices before the operation: `apply!(state, indices, op)`.
+
 ## Tensor Products
 
 If we were operating in the state (Fock) space, and wanted to describe multi-mode Gaussian states,
