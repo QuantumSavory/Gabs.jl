@@ -1,8 +1,14 @@
 # News
 
+## v1.3.8 - 2026-08-04
+
+- Normalize indexed operations to `apply!(state, indices, operation)` and support
+  indexed Gaussian channels. The former `apply!(state, operation, indices)` form
+  for Gaussian unitaries is deprecated but remains available for compatibility.
+
 ## v1.3.7 - 2026-06-06
 
-- Add `apply!(gaussian_state, gaussian_unitary, indices)` method that allows a unitary to be applied to only some modes of a state.
+- Add indexed application of a Gaussian unitary to selected modes of a state.
 
 ## v1.3.6 - 2026-03-19
 
