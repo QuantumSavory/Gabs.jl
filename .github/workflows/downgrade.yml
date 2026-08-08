@@ -22,10 +22,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
         with:
-          version: '1.12'
-      - uses: julia-actions/cache@v3
-        with:
-          delete-old-caches: false
+          version: '1.9'
       - name: Limit workspace to the test project
         run: |
           julia --color=yes -e '
@@ -41,9 +38,15 @@ jobs:
           projects: '.,test'
           skip: LinearAlgebra,Random
           mode: 'forcedeps'
-          julia_version: '1.12'
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
+          julia_version: '1.6.7'
+      - uses: julia-actions/setup-julia@v3
         with:
-          allow_reresolve: false
-          force_latest_compatible_version: false
+          version: 'min-patch'
+      - uses: julia-actions/cache@v3
+        with:
+          delete-old-caches: false
+      - uses: julia-actions/julia-buildpkg@v1
+      - name: Run tests on the locked dependency graph
+        env:
+          JULIA_LOAD_PATH: "${{ github.workspace }}/test:${{ github.workspace }}:@stdlib"
+        run: julia --project=test --startup-file=no --color=yes -e 'include("test/runtests.jl")'
