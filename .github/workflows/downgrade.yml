@@ -46,7 +46,7 @@ jobs:
         with:
           delete-old-caches: false
       - uses: julia-actions/julia-buildpkg@v1
-      - name: Run tests on the locked dependency graph
+      - name: Run tests without re-resolving
         env:
           JULIA_LOAD_PATH: "${{ github.workspace }}/test:${{ github.workspace }}:@stdlib"
-        run: julia --project=test --startup-file=no --color=yes -e 'include("test/runtests.jl")'
+        run: julia --color=yes --check-bounds=yes --project=test test/runtests.jl
