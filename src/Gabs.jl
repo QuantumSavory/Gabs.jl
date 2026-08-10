@@ -27,7 +27,7 @@ export
     norm_factor,
     # predefined Gaussian channels
     displace, squeeze, twosqueeze, phaseshift, beamsplitter,
-    attenuator, amplifier,
+    attenuator, amplifier, sum_gate,
     # random objects
     randstate, randunitary, randchannel, randsymplectic,
     # wigner functions
