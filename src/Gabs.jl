@@ -3,7 +3,7 @@ module Gabs
 import LinearAlgebra
 using LinearAlgebra: I, det, mul!, diag, qr, eigvals, Diagonal, cholesky, Symmetric, dot, Hermitian, logdet
 
-import QuantumInterface: StateVector, AbstractOperator, apply!, tensor, ⊗, directsum, ⊕, entropy_vn, fidelity, logarithmic_negativity, ptrace, embed
+import QuantumInterface: StateVector, AbstractOperator, apply!, tensor, ⊗, directsum, ⊕, entropy_vn, fidelity, logarithmic_negativity, ptrace, embed, express
 
 import Random
 using Random: randn!, AbstractRNG
@@ -19,7 +19,7 @@ export
     # symplectic representations
     QuadPairBasis, QuadBlockBasis, changebasis,
     # operations
-    tensor, ⊗, directsum, ⊕, apply!, ptrace, embed,
+    tensor, ⊗, directsum, ⊕, apply!, ptrace, embed, express,
     # predefined Gaussian states
     vacuumstate, thermalstate, coherentstate, squeezedstate, eprstate,
     # non-Gaussian states
@@ -65,6 +65,8 @@ include("measurements.jl")
 include("generaldyne.jl")
 
 include("homodyne.jl")
+
+include("express.jl")
 
 include("wigner.jl")
 
