@@ -1,10 +1,11 @@
-@testitem "Measurements" begin
-    using Gabs
-    using Random
-    using StableRNGs
-    using StaticArrays
-    using LinearAlgebra: det, I, cholesky, Symmetric
+using Test
+using Gabs
+using Random
+using StableRNGs
+using StaticArrays
+using LinearAlgebra: det, I, cholesky, Symmetric
 
+@testset "Measurements" begin
     @testset "generaldyne" begin
 
         qpairbasis, qblockbasis = QuadPairBasis(1), QuadBlockBasis(1)

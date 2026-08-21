@@ -1,8 +1,9 @@
-@testitem "Symbolic Channels" begin
-    using Gabs
-    using Symbolics
-    using StaticArrays
+using Test
+using Gabs
+using Symbolics
+using StaticArrays
 
+@testset "Symbolic Channels" begin
     nmodes = 2*rand(1:5)
     qpairbasis = QuadPairBasis(nmodes)
     qblockbasis = QuadBlockBasis(nmodes)

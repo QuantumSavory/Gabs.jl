@@ -1,7 +1,8 @@
-@testitem "Unitaries" begin
-    using Gabs
-    using StaticArrays
+using Test
+using Gabs
+using StaticArrays
 
+@testset "Unitaries" begin
     nmodes = rand(1:5)
     qpairbasis = QuadPairBasis(nmodes)
     qblockbasis = QuadBlockBasis(nmodes)

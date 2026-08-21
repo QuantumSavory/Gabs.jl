@@ -1,30 +1,39 @@
-using TestItemRunner
+using ParallelTestRunner
 
 const JET_PROJECT = normpath(joinpath(@__DIR__, "projects", "jet"))
-const test_args = isempty(ARGS) ? ["general"] : ARGS
-const JET_flag = length(test_args) == 1 && startswith(only(test_args), "jet")
+const JET_TEST_PATH = joinpath(@__DIR__, "jet_tests.jl")
 
-if JET_flag
-    @info "Activating the dedicated JET test environment." project=JET_PROJECT
+args = isempty(ARGS) ? ["general"] : ARGS
+jet_only = length(args) == 1 && startswith(only(args), "jet")
+if isempty(ARGS)
+    @info "No test arguments provided; defaulting to `general` tests."
+end
+if jet_only
+    @info "Routing to direct JET test execution." args project=JET_PROJECT
     using Pkg
 
     Pkg.activate(JET_PROJECT)
     Pkg.instantiate()
-    include("jet_tests.jl")
 else
+    @info "Routing to ParallelTestRunner." args
+end
+
+testsuite = find_tests(@__DIR__)
+filter!(testsuite) do (name, _)
+    endswith(name, "_tests")
+end
+
+if !(VERSION >= v"1.10") || get(ENV, "QUANTUMSAVORY_DOWNGRADE_TEST", "") == "true"
+    delete!(testsuite, "general/doctests_tests")
+end
+
+if jet_only
+    # Run JET directly rather than via ParallelTestRunner because
+    # JET does not like being loaded after a Pkg.activate change.
+    include(JET_TEST_PATH)
+else
+    using Pkg
+    Pkg.precompile()
     using Gabs
-
-    testfilter = ti -> begin
-        exclude = Symbol[:jet]
-        if !(VERSION >= v"1.10") || get(ENV, "QUANTUMSAVORY_DOWNGRADE_TEST", "") == "true"
-            push!(exclude, :doctests)
-            push!(exclude, :aqua)
-        end
-
-        return all(!in(exclude), ti.tags)
-    end
-
-    println("Starting tests with $(Threads.nthreads()) threads out of `Sys.CPU_THREADS = $(Sys.CPU_THREADS)`...")
-
-    @run_package_tests filter=testfilter
+    runtests(Gabs, args; testsuite)
 end

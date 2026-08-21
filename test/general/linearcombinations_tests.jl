@@ -1,8 +1,9 @@
-@testitem "Linear Combinations" begin
-    using Gabs
-    using StaticArrays
-    using LinearAlgebra
+using Test
+using Gabs
+using StaticArrays
+using LinearAlgebra
 
+@testset "Linear Combinations" begin
     nmodes = rand(1:3)
     qpairbasis = QuadPairBasis(nmodes)
     qblockbasis = QuadBlockBasis(nmodes)

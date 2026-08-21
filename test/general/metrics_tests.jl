@@ -1,6 +1,7 @@
-@testitem "Metrics" begin
-    using Gabs
+using Test
+using Gabs
 
+@testset "Metrics" begin
     basis1 = QuadPairBasis(1)
     basis2 = QuadPairBasis(2)
     # helper functions

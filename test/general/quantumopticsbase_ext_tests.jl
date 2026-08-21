@@ -1,11 +1,12 @@
-@testitem "QuantumOpticsBase extension" begin
-    using Gabs
-    using LinearAlgebra
-    using QuantumInterface: QuantumOpticsRepr, express
-    using QuantumOpticsBase
+using Test
+using Gabs
+using LinearAlgebra
+using QuantumInterface: QuantumOpticsRepr, express
+using QuantumOpticsBase
 
-    const QO = QuantumOpticsBase
+const QO = QuantumOpticsBase
 
+@testset "QuantumOpticsBase extension" begin
     function samestate(ket1, ket2; atol=1e-10)
         return isapprox(QO.dm(ket1), QO.dm(ket2); atol=atol, rtol=0)
     end

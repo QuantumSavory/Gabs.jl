@@ -1,9 +1,10 @@
-@testitem "Random objects" begin
-    using Gabs
-    using Random
-    using StaticArrays
-    using LinearAlgebra: eigvals, adjoint
+using Test
+using Gabs
+using Random
+using StaticArrays
+using LinearAlgebra: eigvals, adjoint
 
+@testset "Random objects" begin
     @testset "random utils" begin
         nmodes = rand(1:5)
         qpairbasis = QuadPairBasis(nmodes)
