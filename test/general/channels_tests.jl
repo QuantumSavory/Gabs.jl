@@ -1,7 +1,8 @@
-@testitem "Channels" begin
-    using Gabs
-    using StaticArrays
+using Test
+using Gabs
+using StaticArrays
 
+@testset "Channels" begin
     nmodes = rand(1:5)
     qpairbasis = QuadPairBasis(nmodes)
     qblockbasis = QuadBlockBasis(nmodes)

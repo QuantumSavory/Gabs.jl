@@ -1,9 +1,10 @@
-@testitem "Automatic differentiation" begin
-    using Gabs
-    using DifferentiationInterface
-    import ForwardDiff
-    import FiniteDiff
+using Test
+using Gabs
+using DifferentiationInterface
+import ForwardDiff
+import FiniteDiff
 
+@testset "Automatic differentiation" begin
 
     @testset "derivatives" begin
 
@@ -45,4 +46,3 @@
 
     end
 end
-        

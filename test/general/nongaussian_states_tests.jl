@@ -1,7 +1,8 @@
-@testitem "Non-Gaussian States" begin
-    using Gabs
-    using LinearAlgebra
+using Test
+using Gabs
+using LinearAlgebra
 
+@testset "Non-Gaussian States" begin
     @testset "Cat States - Basic Properties" begin
         basis = QuadPairBasis(1)
         α = 1.0 + 0.5im

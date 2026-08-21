@@ -1,8 +1,9 @@
-@testitem "LinearCombinations_ext Integration and Advanced Features" begin
-    using Gabs
-    using LinearAlgebra
-    using StaticArrays
+using Test
+using Gabs
+using LinearAlgebra
+using StaticArrays
 
+@testset "LinearCombinations_ext Integration and Advanced Features" begin
     nmodes1 = 1
     nmodes2 = 2
     qpairbasis1 = QuadPairBasis(nmodes1)

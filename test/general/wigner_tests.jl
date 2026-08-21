@@ -1,7 +1,8 @@
-@testitem "Quadrature pair basis" begin
-    using Gabs
-    using StaticArrays
+using Test
+using Gabs
+using StaticArrays
 
+@testset "Quadrature pair basis" begin
     basis1 = QuadPairBasis(1)
     @testset "symplectic form" begin
         Omega = symplecticform(2*basis1)

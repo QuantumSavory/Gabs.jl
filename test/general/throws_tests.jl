@@ -1,7 +1,8 @@
-@testitem "Throws" begin
-    using Gabs
-    using CairoMakie
+using Test
+using Gabs
+using CairoMakie
 
+@testset "Throws" begin
     basis1 = QuadPairBasis(1)
     @testset "type throws" begin
         @test_throws DimensionMismatch GaussianState(basis1, [1.0, 2.0, 3.0], [3.0 4.0; 5.0 6.0])

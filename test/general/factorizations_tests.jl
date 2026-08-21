@@ -1,7 +1,8 @@
-@testitem "Factorizations" begin
-    using Gabs
-    using LinearAlgebra
+using Test
+using Gabs
+using LinearAlgebra
 
+@testset "Factorizations" begin
     @testset "williamson" begin
         nmodes = rand(1:5)
         qpairbasis = QuadPairBasis(nmodes)

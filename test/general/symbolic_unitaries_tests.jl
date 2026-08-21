@@ -1,9 +1,10 @@
-@testitem "Symbolic Unitaries" begin
-    using Gabs
-    using Symbolics
-    using StaticArrays
-    using LinearAlgebra: det
+using Test
+using Gabs
+using Symbolics
+using StaticArrays
+using LinearAlgebra: det
 
+@testset "Symbolic Unitaries" begin
     nmodes = rand(1:5)
     qpairbasis = QuadPairBasis(nmodes)
     qblockbasis = QuadBlockBasis(nmodes)

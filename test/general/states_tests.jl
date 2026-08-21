@@ -1,8 +1,9 @@
-@testitem "States" begin
-    using Gabs
-    using StaticArrays
-    using LinearAlgebra: det
+using Test
+using Gabs
+using StaticArrays
+using LinearAlgebra: det
 
+@testset "States" begin
     nmodes = rand(1:5)
     qpairbasis = QuadPairBasis(nmodes)
     qblockbasis = QuadBlockBasis(nmodes)
