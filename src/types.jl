@@ -497,7 +497,7 @@ function apply!(state::StellarState{C,G}, indices::AbstractVector{<:Int}, op::Ga
         quad_indices[2k-1] = 2i - 1
         quad_indices[2k]   = 2i
     end
-    return _applygaussian!(state, op, quad_indices)
+    return _applygaussian!(state, quad_indices, op)
 end
 function apply!(state::StellarState{C,G}, indices::AbstractVector{<:Int}, op::GaussianUnitary) where {C,G<:GaussianUnitary{<:QuadBlockBasis}}
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
@@ -509,7 +509,7 @@ function apply!(state::StellarState{C,G}, indices::AbstractVector{<:Int}, op::Ga
         quad_indices[k]   = i
         quad_indices[k+l] = i + state.basis.nmodes
     end
-    return _applygaussian!(state, op, quad_indices)
+    return _applygaussian!(state, quad_indices, op)
 end
 function _applygaussian!(state::StellarState, quad_indices::Vector{Int}, op::GaussianUnitary)
     d, S = op.disp, op.symplectic
@@ -557,18 +557,21 @@ function GaussianState(x::StellarState)
     return x.gaussian * vacuumstate(x.basis; ħ = x.ħ)
 end
 """
-    StellarState(x::GaussianState)
+    StellarState(x::GaussianState; atol = 1e-8)
 
-Rank-zero stellar state of a pure Gaussian state. The Williamson symplectic factor supplies
-`S` with `V = (ħ/2)SSᵀ` and the mean supplies `d`; the pair is the inverse of
-`GaussianState(::StellarState)`.
+Rank-zero stellar state of a pure Gaussian state. The Gaussian factor is the positive
+symmetric symplectic square root of `(2/ħ)V`, which satisfies `V = (ħ/2)GGᵀ` by
+construction; the mean supplies `d`. Inverse of `GaussianState(::StellarState)`.
+
+A Gaussian state admits this decomposition exactly when it is pure, and `(2/ħ)V` is
+symplectic exactly then, so the square root is symplectic whenever it exists.
 """
 function StellarState(x::GaussianState; atol::Real = 1e-8)
-    F = williamson(x)
-    all(v -> isapprox(v, x.ħ/2; atol = atol), F.spectrum) || throw(ArgumentError(STELLAR_PURITY_ERROR))
+    isapprox(purity(x), 1.0; atol = atol) || throw(ArgumentError(STELLAR_PURITY_ERROR))
     n = x.basis.nmodes
     core = fill(one(ComplexF64), ntuple(_ -> 1, n))
-    return StellarState(core, GaussianUnitary(x.basis, x.mean, F.S; ħ = x.ħ))
+    G = Matrix(sqrt(Symmetric((2/x.ħ) .* x.covar)))
+    return StellarState(core, GaussianUnitary(x.basis, x.mean, G; ħ = x.ħ))
 end
 
 purity(::StellarState) = 1.0

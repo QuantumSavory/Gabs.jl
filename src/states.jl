@@ -685,6 +685,11 @@ function _ptrace(state::GaussianState{B,M,V}, indices::T) where {B<:QuadBlockBas
     return mean′′, covar′′
 end
 
+ptrace(::StellarState, ::Int) = throw(ArgumentError(STELLAR_PTRACE_ERROR))
+ptrace(::StellarState, ::AbstractVector{<:Int}) = throw(ArgumentError(STELLAR_PTRACE_ERROR))
+ptrace(::Type{Tm}, ::Type{Tc}, ::StellarState, ::Any) where {Tm,Tc} =
+    throw(ArgumentError(STELLAR_PTRACE_ERROR))
+    
 """
     embed(basis::SymplecticBasis, idx::Int, state::GaussianState)
     embed(basis::SymplecticBasis, indices::AbstractVector{<:Int}, state::GaussianState)

@@ -360,31 +360,34 @@ function catstate(basis::SymplecticBasis, αs::AbstractVector, phases::AbstractV
 end
 
 """
-    addphoton(x::StellarState)
+    addphoton(x::StellarState, index::Int = 1)
 
-Normalized single-mode photon addition. The Gaussian factor is unchanged,
-while the core absorbs the Bogoliubov-transformed ladder operator.
+Normalized single-mode photon addition on a particular index of a stellar state. 
+The Gaussian factor is unchanged, while the core absorbs the Bogoliubov-transformed ladder operator.
 """
-function addphoton(x::StellarState{C,G}) where {C,G<:GaussianUnitary{<:SymplecticBasis}}
+function addphoton(x::StellarState, index::Int = 1)
+    1 ≤ index ≤ nmodes(x) || throw(ArgumentError(INDEX_ERROR))
     mu, nu, gamma = _bogoliubov(x.gaussian)
-    return StellarState(_coreaction(x.core, mu, nu, gamma), x.gaussian)
+    return StellarState(_coreaction(x.core, @view(mu[index,:]), @view(nu[index,:]),
+                                    gamma[index]), x.gaussian)
 end
 """
-    subtractphoton(x::StellarState)
+    subtractphoton(x::StellarState, index::Int = 1)
 
-Normalized single-mode photon subtraction. The Gaussian factor is unchanged,
-while the core absorbs the Bogoliubov-transformed ladder operator.
+Normalized single-mode photon subtraction  on a particular index of a stellar state.
+The Gaussian factor is unchanged, while the core absorbs the Bogoliubov-transformed ladder operator.
 """
-function subtractphoton(x::StellarState{C,G}) where {C,G<:GaussianUnitary{<:SymplecticBasis}}
-
+function subtractphoton(x::StellarState, index::Int = 1)
+    1 ≤ index ≤ nmodes(x) || throw(ArgumentError(INDEX_ERROR))
     mu, nu, gamma = _bogoliubov(x.gaussian)
-    return StellarState(_coreaction(x.core, conj(nu), conj(mu), conj(gamma)), x.gaussian)
+    return StellarState(_coreaction(x.core, conj.(@view(nu[index,:])),
+                                    conj.(@view(mu[index,:])), conj(gamma[index])),
+                        x.gaussian)
 end
-
 #=
 With `aⱼ = (qⱼ + i pⱼ)/√(2ħ)`, returns the matrices and vector satisfying
 
-    U† a†ₖ U = Σₖ (μⱼₖ a†ₖ + νⱼₖ aₖ) + γⱼ.
+    U† a†ⱼ U = Σₖ (μⱼₖ a†ₖ + νⱼₖ aₖ) + γⱼ.
 
 Symplecticity is `μμ† - νν† = I`, `μν† = νμ†`, `μ†μ - νᵀν̄ = I`, `μᵀν̄ = ν†μ`.
 =#

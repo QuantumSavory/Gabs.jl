@@ -1,7 +1,7 @@
 module Gabs
 
 import LinearAlgebra
-using LinearAlgebra: I, det, mul!, diag, qr, eigvals, Diagonal, cholesky, Symmetric, dot, Hermitian, logdet, norm
+using LinearAlgebra: I, det, mul!, diag, qr, eigvals, Diagonal, cholesky, Symmetric, dot, Hermitian, logdet
 
 import QuantumInterface: StateVector, AbstractOperator, apply!, tensor, ⊗, directsum, ⊕, entropy_vn, fidelity, logarithmic_negativity, ptrace, embed
 
@@ -73,6 +73,8 @@ include("homodyne.jl")
 include("wigner.jl")
 
 include("metrics.jl")
+
+include("stellar.jl")
 
 include("linearcombinations.jl")
 
