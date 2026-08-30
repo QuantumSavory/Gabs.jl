@@ -1,7 +1,7 @@
 module Gabs
 
 import LinearAlgebra
-using LinearAlgebra: I, det, mul!, diag, qr, eigvals, Diagonal, cholesky, Symmetric, dot, Hermitian, logdet
+using LinearAlgebra: I, det, mul!, diag, qr, eigvals, Diagonal, cholesky, Symmetric, dot, Hermitian, logdet, norm
 
 import QuantumInterface: StateVector, AbstractOperator, apply!, tensor, ⊗, directsum, ⊕, entropy_vn, fidelity, logarithmic_negativity, ptrace, embed
 
@@ -14,6 +14,7 @@ using SymplecticMatrices: williamson, Williamson, polar, Polar, blochmessiah, Bl
 export
     # types
     GaussianState, GaussianUnitary, GaussianChannel, GaussianLinearCombination,
+    StellarState,
     # Gaussian measurements
     generaldyne, Generaldyne, homodyne, Homodyne,
     # symplectic representations
@@ -23,19 +24,22 @@ export
     # predefined Gaussian states
     vacuumstate, thermalstate, coherentstate, squeezedstate, eprstate,
     # non-Gaussian states
-    catstate_even, catstate_odd, catstate, gkpstate,
+    catstate_even, catstate_odd, catstate, gkpstate, fockstate,
+    addphoton, subtractphoton,
     norm_factor,
     # predefined Gaussian channels
     displace, squeeze, twosqueeze, phaseshift, beamsplitter,
     attenuator, amplifier,
     # random objects
-    randstate, randunitary, randchannel, randsymplectic,
+    randstate, randunitary, randchannel, randsymplectic, randstellar,
     # wigner functions
     wigner, wignerchar,
     # symplectic form and checks
     symplecticform, issymplectic, isgaussian, sympspectrum,
     # factorizations
     williamson, Williamson, polar, Polar, blochmessiah, BlochMessiah,
+    # stellar things
+    stellarfunction, stellarrank,
     # metrics
     purity, entropy_vn, fidelity, logarithmic_negativity,
     cross_wigner, cross_wignerchar,

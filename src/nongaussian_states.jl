@@ -358,3 +358,67 @@ function catstate(basis::SymplecticBasis, αs::AbstractVector, phases::AbstractV
     end
     return result
 end
+
+"""
+    addphoton(x::StellarState)
+
+Normalized single-mode photon addition. The Gaussian factor is unchanged,
+while the core absorbs the Bogoliubov-transformed ladder operator.
+"""
+function addphoton(x::StellarState{C,G}) where {C,G<:GaussianUnitary{<:SymplecticBasis}}
+    mu, nu, gamma = _bogoliubov(x.gaussian)
+    return StellarState(_coreaction(x.core, mu, nu, gamma), x.gaussian)
+end
+"""
+    subtractphoton(x::StellarState)
+
+Normalized single-mode photon subtraction. The Gaussian factor is unchanged,
+while the core absorbs the Bogoliubov-transformed ladder operator.
+"""
+function subtractphoton(x::StellarState{C,G}) where {C,G<:GaussianUnitary{<:SymplecticBasis}}
+
+    mu, nu, gamma = _bogoliubov(x.gaussian)
+    return StellarState(_coreaction(x.core, conj(nu), conj(mu), conj(gamma)), x.gaussian)
+end
+
+#=
+With `aⱼ = (qⱼ + i pⱼ)/√(2ħ)`, returns the matrices and vector satisfying
+
+    U† a†ₖ U = Σₖ (μⱼₖ a†ₖ + νⱼₖ aₖ) + γⱼ.
+
+Symplecticity is `μμ† - νν† = I`, `μν† = νμ†`, `μ†μ - νᵀν̄ = I`, `μᵀν̄ = ν†μ`.
+=#
+function _bogoliubov(op::GaussianUnitary{<:QuadBlockBasis,D,S}) where {D,S}
+    n = nmodes(op)
+    d, M = op.disp, op.symplectic
+    A, B = @view(M[1:n, 1:n]), @view(M[1:n, n+1:2n])
+    C, E = @view(M[n+1:2n, 1:n]), @view(M[n+1:2n, n+1:2n])
+    mu = ((A .+ E) .- im .* (C .- B)) ./ 2
+    nu = ((A .- E) .- im .* (C .+ B)) ./ 2
+    gamma = (@view(d[1:n]) .- im .* @view(d[n+1:2n])) ./ sqrt(2*op.ħ)
+    return mu, nu, gamma
+end
+_bogoliubov(op::GaussianUnitary{<:QuadPairBasis,D,S}) where {D,S} =
+    _bogoliubov(changebasis(QuadBlockBasis, op))
+
+# applies Σₖ up[k] a†ₖ + Σₖ down[k] aₖ + shift, then normalizes
+function _coreaction(core::AbstractArray{T,N}, up::AbstractVector,
+                     down::AbstractVector, shift::Number) where {T,N}
+    Tc = complex(float(promote_type(T, eltype(up), eltype(down), typeof(shift))))
+    core′ = zeros(Tc, ntuple(k -> size(core, k) + 1, Val(N)))
+    @inbounds for I in CartesianIndices(core)
+        c = core[I]
+        iszero(c) && continue
+        core′[I] += shift * c
+        for k in Base.OneTo(N)
+            nk = I[k]
+            core′[CartesianIndex(ntuple(l -> l == k ? I[l] + 1 : I[l], Val(N)))] +=
+                up[k] * sqrt(nk) * c
+            nk > 1 && (core′[CartesianIndex(ntuple(l -> l == k ? I[l] - 1 : I[l], Val(N)))] +=
+                down[k] * sqrt(nk - 1) * c)
+        end
+    end
+    nrm = sqrt(sum(abs2, core′))
+    iszero(nrm) && throw(ArgumentError(CORE_ERROR))
+    return _trimcore(core′ ./ nrm)
+end
