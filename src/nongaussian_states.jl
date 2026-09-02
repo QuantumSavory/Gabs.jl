@@ -389,7 +389,7 @@ With `aⱼ = (qⱼ + i pⱼ)/√(2ħ)`, returns the matrices and vector satisfyi
 
     U† a†ⱼ U = Σₖ (μⱼₖ a†ₖ + νⱼₖ aₖ) + γⱼ.
 
-Symplecticity is `μμ† - νν† = I`, `μν† = νμ†`, `μ†μ - νᵀν̄ = I`, `μᵀν̄ = ν†μ`.
+Symplecticity is `μμ† - νν† = I`, `μνᵀ = νμᵀ`, `μ†μ - νᵀν̄ = I`, `μᵀν̄ = ν†μ`.
 =#
 function _bogoliubov(op::GaussianUnitary{<:QuadBlockBasis,D,S}) where {D,S}
     n = nmodes(op)
