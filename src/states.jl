@@ -689,7 +689,7 @@ ptrace(::StellarState, ::Int) = throw(ArgumentError(STELLAR_PTRACE_ERROR))
 ptrace(::StellarState, ::AbstractVector{<:Int}) = throw(ArgumentError(STELLAR_PTRACE_ERROR))
 ptrace(::Type{Tm}, ::Type{Tc}, ::StellarState, ::Any) where {Tm,Tc} =
     throw(ArgumentError(STELLAR_PTRACE_ERROR))
-    
+
 """
     embed(basis::SymplecticBasis, idx::Int, state::GaussianState)
     embed(basis::SymplecticBasis, indices::AbstractVector{<:Int}, state::GaussianState)
@@ -911,6 +911,8 @@ changebasis(::Type{<:QuadPairBasis}, state::GaussianState{<:QuadPairBasis,M,V}) 
 Change the symplectic basis of a stellar state.
 """
 changebasis(::Type{B1}, x::StellarState) where {B1<:SymplecticBasis} = StellarState(x.core, changebasis(B1, x.gaussian))
+changebasis(::Type{<:QuadPairBasis}, x::StellarState{C,<:GaussianUnitary{<:QuadPairBasis}}) where {C} = x
+changebasis(::Type{<:QuadBlockBasis}, x::StellarState{C,<:GaussianUnitary{<:QuadBlockBasis}}) where {C} = x
 
 """
     sympspectrum(state::GaussianState)
