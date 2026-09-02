@@ -567,10 +567,13 @@ A Gaussian state admits this decomposition exactly when it is pure, and `(2/ħ)V
 symplectic exactly then, so the square root is symplectic whenever it exists.
 """
 function StellarState(x::GaussianState; atol::Real = 1e-8)
-    isapprox(purity(x), 1.0; atol = atol) || throw(ArgumentError(STELLAR_PURITY_ERROR))
+    G = sqrt(Symmetric((2/x.ħ) .* x.covar))
+    eltype(G) <: Real || throw(ArgumentError(STELLAR_PURITY_ERROR))
+    G = Matrix(G)
+    issymplectic(x.basis, G; atol = atol, rtol = atol) ||
+        throw(ArgumentError(STELLAR_PURITY_ERROR))
     n = x.basis.nmodes
     core = fill(one(ComplexF64), ntuple(_ -> 1, n))
-    G = Matrix(sqrt(Symmetric((2/x.ħ) .* x.covar)))
     return StellarState(core, GaussianUnitary(x.basis, x.mean, G; ħ = x.ħ))
 end
 
