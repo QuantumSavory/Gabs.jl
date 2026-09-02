@@ -477,7 +477,7 @@ blochmessiah
 polar
 ```
 Let's see an example with the Williamson decomposition:
-```@repl; using Gabs
+```@repl
 using Gabs, LinearAlgebra
 state = randstate(QuadBlockBasis(1))
 F = williamson(state)
