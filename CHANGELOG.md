@@ -1,5 +1,9 @@
 # News
 
+## v1.3.9 - dev
+
+- Add stellar state interface.
+
 ## v1.3.8 - 2026-08-04
 
 - Normalize indexed operations to `apply!(state, indices, operation)` and support
