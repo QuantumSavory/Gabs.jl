@@ -1,7 +1,7 @@
 module Gabs
 
 import LinearAlgebra
-using LinearAlgebra: I, det, mul!, diag, qr, eigvals, Diagonal, cholesky, Symmetric, dot, Hermitian, logdet
+using LinearAlgebra: I, det, mul!, diag, qr, eigvals, Diagonal, cholesky, Symmetric, dot, Hermitian, logdet, eigen
 
 import QuantumInterface: StateVector, AbstractOperator, apply!, tensor, ⊗, directsum, ⊕, entropy_vn, fidelity, logarithmic_negativity, ptrace, embed
 
