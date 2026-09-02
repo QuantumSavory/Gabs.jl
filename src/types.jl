@@ -446,7 +446,9 @@ function Base.getproperty(x::StellarState, s::Symbol)
 end
 Base.propertynames(::StellarState) = (:basis, :core, :gaussian, :ħ)
 Base.:(==)(x::StellarState, y::StellarState) = x.core == y.core && x.gaussian == y.gaussian
-Base.isapprox(x::StellarState, y::StellarState; kwargs...) = isapprox(x.core, y.core; kwargs...) && isapprox(x.gaussian, y.gaussian; kwargs...)
+Base.isapprox(x::StellarState, y::StellarState; kwargs...) =
+    size(x.core) == size(y.core) && isapprox(x.core, y.core; kwargs...) &&
+    isapprox(x.gaussian, y.gaussian; kwargs...)
 Base.copy(x::StellarState) = StellarState(copy(x.core), copy(x.gaussian))
 nmodes(x::StellarState) = nmodes(x.gaussian)
 
