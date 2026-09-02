@@ -421,7 +421,10 @@ end
     fockstate([Tc=Array{ComplexF64}], basis::SymplecticBasis, photons<:AbstractVector)
 
 `StellarState` whose core is a single Fock state and whose Gaussian factor is the identity.
-The stellar rank equals the total photon number.
+
+A vector gives the occupation of each mode, so the stellar rank is `sum(photons)`. A scalar
+is broadcast to every mode, as elsewhere in Gabs, so `fockstate(basis, n)` is `|n,…,n⟩` with
+rank `n * basis.nmodes`.
 """
 function fockstate(::Type{Tc}, basis::SymplecticBasis{N}, photons::P; ħ = 2) where {Tc,N<:Int,P}
     core, op = _fockstate(basis, photons; ħ = ħ)
@@ -437,6 +440,8 @@ end
 function _fockstate(basis::SymplecticBasis{N}, photons::P; ħ = 2) where {N<:Int,P<:AbstractVector}
     length(photons) == basis.nmodes || throw(DimensionMismatch(
         lazy"The occupation vector must carry one entry per mode."))
+    all(≥(0), photons) || throw(ArgumentError(
+        lazy"The occupation of each mode must be a nonnegative integer."))
     dims = Tuple(photons .+ 1)
     core = zeros(ComplexF64, dims)
     core[CartesianIndex(dims)] = one(ComplexF64)
