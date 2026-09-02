@@ -408,11 +408,6 @@ A stellar state of rank `r` is `|ψ⟩ = U|C⟩`, where `U` is a Gaussian unitar
 multi-indices `k = (k₁,…,kₙ)`, of total degree `r`. The rank `r` is invariant under
 every Gaussian unitary and vanishes exactly on the pure Gaussian states.
 
-The decomposition is not unique: `(|C⟩, U) → (V|C⟩, U V†)` for any passive `V` denotes
-the same ray, since only passive unitaries preserve finite Fock support. 
-Therefore, in Gabs, equality of `StellarState` objects is equality of the stored data, 
-not of the states.
-
 ## Example
 
 ```jldoctest
