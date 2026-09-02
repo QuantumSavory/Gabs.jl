@@ -580,8 +580,8 @@ function StellarState(x::GaussianState{B,M,V}; atol::Real = 1e-8) where {B,M,V}
     return StellarState(core, GaussianUnitary(x.basis, copy(x.mean), G; ħ = x.ħ))
 end
 
-purity(::StellarState) = 1.0
-entropy_vn(::StellarState) = 0.0
+purity(x::StellarState) = one(real(eltype(x.core)))
+entropy_vn(x::StellarState) = zero(real(eltype(x.core)))
 
 """
     isgaussian(x::GaussianState)
