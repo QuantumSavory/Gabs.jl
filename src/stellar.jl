@@ -4,7 +4,7 @@ function _stellargaussian(op::GaussianUnitary)
     tau = conj(gamma) - Sigma * gamma
     n = nmodes(op)
     Vsum = (op.ħ/2) .* (op.symplectic * transpose(op.symplectic) + I)
-    scale = op.ħ^(n/2) * det(Vsum)^(-1/4) * exp(-dot(op.disp, Vsum \ op.disp) / 4)
+    scale = exp((n/2)*log(op.ħ) - logdet(Vsum)/4 - dot(op.disp, Vsum \ op.disp)/4)
     return Sigma, tau, scale
 end
 
