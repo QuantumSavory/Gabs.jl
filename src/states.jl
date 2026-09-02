@@ -887,7 +887,7 @@ function changebasis(::Type{B1}, state::GaussianState{B2,M,V}) where {B1<:QuadBl
             covar[nmodes + j, nmodes + i] = state.covar[2*j, 2*i]
         end
     end
-    return GaussianState(B1(nmodes), mean, covar)
+    return GaussianState(B1(nmodes), mean, covar; ħ = state.ħ)
 end
 function changebasis(::Type{B1}, state::GaussianState{B2,M,V}) where {B1<:QuadPairBasis,B2<:QuadBlockBasis,M,V}
     nmodes = state.basis.nmodes
@@ -906,7 +906,7 @@ function changebasis(::Type{B1}, state::GaussianState{B2,M,V}) where {B1<:QuadPa
             covar[2*j, 2*i] = state.covar[nmodes + j, nmodes + i]
         end
     end
-    return GaussianState(B1(nmodes), mean, covar)
+    return GaussianState(B1(nmodes), mean, covar; ħ = state.ħ)
 end
 changebasis(::Type{<:QuadBlockBasis}, state::GaussianState{<:QuadBlockBasis,M,V}) where {M,V} = state
 changebasis(::Type{<:QuadPairBasis}, state::GaussianState{<:QuadPairBasis,M,V}) where {M,V} = state
