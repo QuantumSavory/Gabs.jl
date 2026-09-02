@@ -568,14 +568,13 @@ construction; the mean supplies `d`. Inverse of `GaussianState(::StellarState)`.
 A Gaussian state admits this decomposition exactly when it is pure, and `(2/ħ)V` is
 symplectic exactly then, so the square root is symplectic whenever it exists.
 """
-function StellarState(x::GaussianState; atol::Real = 1e-8)
-    G = sqrt(Symmetric((2/x.ħ) .* x.covar))
-    eltype(G) <: Real || throw(ArgumentError(STELLAR_PURITY_ERROR))
-    G = Matrix(G)
+function StellarState(x::GaussianState{B,M,V}; atol::Real = 1e-8) where {B,M,V}
+    F = eigen(Symmetric((2/x.ħ) .* x.covar))
+    all(≥(0), F.values) || throw(ArgumentError(STELLAR_PURITY_ERROR))
+    G = F.vectors * Diagonal(sqrt.(F.values)) * transpose(F.vectors)
     issymplectic(x.basis, G; atol = atol, rtol = atol) ||
         throw(ArgumentError(STELLAR_PURITY_ERROR))
-    n = x.basis.nmodes
-    core = fill(one(ComplexF64), ntuple(_ -> 1, n))
+    core = fill(one(ComplexF64), ntuple(_ -> 1, Val(nmodes(x.basis))))
     return StellarState(core, GaussianUnitary(x.basis, x.mean, G; ħ = x.ħ))
 end
 
