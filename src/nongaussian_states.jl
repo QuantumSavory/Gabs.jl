@@ -363,11 +363,6 @@ end
     addphoton(x::StellarState, index::Int = 1)
 
 Normalized photon addition on mode `index` of a stellar state: `a†|ψ⟩/‖a†|ψ⟩‖`.
-The Gaussian factor is unchanged, while the core absorbs `U† a†ᵢ U`, i.e. row `index`
-of `(μ ν)` with constant `γᵢ`.
-
-The rank increases by exactly one: the top-degree part of the core is multiplied by the
-linear form `Σₖ μᵢₖ zₖ`, nonzero because `μ` is invertible.
 """
 function addphoton(x::StellarState, index::Int = 1)
     1 ≤ index ≤ nmodes(x) || throw(ArgumentError(INDEX_ERROR))
@@ -387,13 +382,6 @@ end
     subtractphoton(x::StellarState, index::Int = 1)
 
 Normalized photon subtraction on mode `index` of a stellar state: `a|ψ⟩/‖a|ψ⟩‖`.
-The Gaussian factor is unchanged, while the core absorbs `U† aᵢ U`, which is the adjoint
-of the addition data: the two coefficient blocks exchange and every entry conjugates.
-
-The rank need not increase. The top-degree coefficient is `ν̄ᵢₖ`, so the rank rises by one
-when row `index` of `ν` is nonzero and otherwise falls. For a passive Gaussian factor
-`ν = 0` and this reduces to the annihilation operator on the core; it then throws for the
-vacuum core, where `a|ψ⟩ = 0`.
 """
 function subtractphoton(x::StellarState, index::Int = 1)
     1 ≤ index ≤ nmodes(x) || throw(ArgumentError(INDEX_ERROR))
