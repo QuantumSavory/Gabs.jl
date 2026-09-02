@@ -432,7 +432,7 @@ symplectic: 2×2 Matrix{Float64}:
  0.0  1.0
 ```
 """
-@kwdef struct StellarState{C,G<:GaussianUnitary} <: StateVector{C,G}
+struct StellarState{C,G<:GaussianUnitary} <: StateVector{C,G}
     core::C
     gaussian::G
     function StellarState(c::C, g::G) where {C,G<:GaussianUnitary}
