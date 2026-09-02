@@ -1,7 +1,7 @@
 name = "Gabs"
 uuid = "0eb812ee-a11f-4f5e-b8d4-bb8a44f06f50"
 authors = ["Andrew Kille"]
-version = "1.3.8"
+version = "1.3.9-dev"
 
 [workspace]
 projects = ["test", "test/projects/jet"]

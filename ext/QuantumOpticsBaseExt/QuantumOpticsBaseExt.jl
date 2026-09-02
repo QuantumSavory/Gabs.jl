@@ -37,7 +37,7 @@ end
 
 function _vacuum_ket(cutoff::Integer, nmodes::Integer)
     mode_basis = FockBasis(cutoff)
-    vacuum = fockstate(mode_basis, 0)
+    vacuum = QuantumOpticsBase.fockstate(mode_basis, 0)
     return isone(nmodes) ? vacuum : tensor(ntuple(_ -> vacuum, nmodes)...)
 end
 
