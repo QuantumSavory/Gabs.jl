@@ -576,8 +576,8 @@ function StellarState(x::GaussianState{B,M,V}; atol::Real = 1e-8) where {B,M,V}
     G = F.vectors * Diagonal(sqrt.(F.values)) * transpose(F.vectors)
     issymplectic(x.basis, G; atol = atol, rtol = atol) ||
         throw(ArgumentError(STELLAR_PURITY_ERROR))
-    core = fill(one(ComplexF64), ntuple(_ -> 1, Val(nmodes(x.basis))))
-    return StellarState(core, GaussianUnitary(x.basis, x.mean, G; ħ = x.ħ))
+    core = fill(one(ComplexF64), ntuple(_ -> 1, nmodes(x.basis)))
+    return StellarState(core, GaussianUnitary(x.basis, copy(x.mean), G; ħ = x.ħ))
 end
 
 purity(::StellarState) = 1.0
