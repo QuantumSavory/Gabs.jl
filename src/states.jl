@@ -435,7 +435,8 @@ function _fockstate(basis::SymplecticBasis{N}, photons::P; ħ = 2) where {N<:Int
     return _fockstate(basis, fill(photons, basis.nmodes); ħ = ħ)
 end
 function _fockstate(basis::SymplecticBasis{N}, photons::P; ħ = 2) where {N<:Int,P<:AbstractVector}
-    length(photons) == basis.nmodes || throw(DimensionMismatch(STELLAR_ERROR))
+    length(photons) == basis.nmodes || throw(DimensionMismatch(
+        lazy"The occupation vector must carry one entry per mode."))
     dims = Tuple(photons .+ 1)
     core = zeros(ComplexF64, dims)
     core[CartesianIndex(dims)] = one(ComplexF64)

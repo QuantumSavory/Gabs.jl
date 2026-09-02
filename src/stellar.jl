@@ -64,7 +64,8 @@ a global phase. The gauge here is `𝒩 > 0`.
 """
 function stellarfunction(x::StellarState, z::AbstractVector)
     n = nmodes(x)
-    length(z) == n || throw(DimensionMismatch(STELLAR_ERROR))
+    length(z) == n || throw(DimensionMismatch(
+        lazy"The evaluation point must carry one coordinate per mode."))
     Sigma, tau, scale = _stellargaussian(x.gaussian)
     p = _stellarpolynomial(x)
     val = zero(ComplexF64)

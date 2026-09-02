@@ -130,7 +130,7 @@ randstellar(rng::AbstractRNG, basis::SymplecticBasis{N}, rank::Int; passive = fa
     randstellar(basis, rank; passive = passive, ħ = ħ, rng = rng)
 function _randstellar(rng::AbstractRNG, basis::SymplecticBasis{N}, rank::Int;
                       passive = false, ħ = 2) where {N<:Int}
-    rank ≥ 0 || throw(ArgumentError(RANK_ERROR))
+                      rank ≥ 0 || throw(ArgumentError(lazy"The stellar rank must be a nonnegative integer."))
     n = basis.nmodes
     core = zeros(ComplexF64, ntuple(_ -> rank + 1, n))
     @inbounds for I in CartesianIndices(core)

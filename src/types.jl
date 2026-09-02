@@ -570,7 +570,9 @@ symplectic exactly then, so the square root is symplectic whenever it exists.
 """
 function StellarState(x::GaussianState{B,M,V}; atol::Real = 1e-8) where {B,M,V}
     F = eigen(Symmetric((2/x.ħ) .* x.covar))
-    all(≥(0), F.values) || throw(ArgumentError(STELLAR_PURITY_ERROR))
+    all(>(0), F.values) || throw(ArgumentError(
+        lazy"The covariance matrix is not positive definite, so its symmetric square root
+        does not exist."))
     G = F.vectors * Diagonal(sqrt.(F.values)) * transpose(F.vectors)
     issymplectic(x.basis, G; atol = atol, rtol = atol) ||
         throw(ArgumentError(STELLAR_PURITY_ERROR))
