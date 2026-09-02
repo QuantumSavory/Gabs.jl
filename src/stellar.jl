@@ -52,10 +52,12 @@ end
 """
     stellarfunction(x::StellarState, z)
 
-Bargmann function `F(z) = Σₖ ψₖ z^k / √(k!)` of a stellar state, evaluated at `z`.
-It factors as `𝒩 exp(½zᵀΣz + τᵀz) p(z)` with `Σ = ν̄μ⁻¹`, `τ = γ̄ - Σγ`, and `p` a
-polynomial of total degree `stellarrank(x)`. The exponential factor has no zeros, so the zeros
-of `F` are the zeros of `p` and are `stellarrank(x)` in number.
+Bargmann function `F(z) = Σₖ ψₖ z^k / √(k!)` of a stellar state, evaluated at `z`, where `k`
+runs over occupation multi-indices, `z^k = ∏ⱼ zⱼ^kⱼ`, and `k! = ∏ⱼ kⱼ!`.
+
+It factors as `𝒩 exp(½zᵀΣz + τᵀz) p(z)` with `Σ = ν̄μ⁻¹`, `τ = γ̄ - Σγ`, and `p` a polynomial
+of total degree exactly `stellarrank(x)`. The exponential factor has no zeros, so the zeros
+of `F` are the zeros of `p`; for one mode that is `stellarrank(x)` points with multiplicity.
 
 `GaussianUnitary` records `(d,S)` and not a metaplectic element, so `F` is fixed only up to
 a global phase. The gauge here is `𝒩 > 0`.
