@@ -188,6 +188,9 @@ covariance: 4×4 Matrix{Float64}:
  0.0      0.0      0.0      1.24483
 ```
 
+To apply a Gaussian unitary or channel to selected modes, place the mode index or
+indices before the operation: `apply!(state, indices, op)`.
+
 ## Tensor Products
 
 If we were operating in the state (Fock) space, and wanted to describe multi-mode Gaussian states,
@@ -474,7 +477,7 @@ blochmessiah
 polar
 ```
 Let's see an example with the Williamson decomposition:
-```@repl; using Gabs
+```@repl
 using Gabs, LinearAlgebra
 state = randstate(QuadBlockBasis(1))
 F = williamson(state)
@@ -528,3 +531,193 @@ mpsstate
     this reliably, while independent per-mode products of single-mode states do not.
     `mpsstate` detects this and raises an informative error rather than silently returning
     an incorrect state. Single-mode states are unaffected.
+## Stellar States
+
+Every Gaussian state is pure or mixed, but no Gaussian state exhibits negativity in its Wigner function. To describe pure non-Gaussian states while keeping the phase space formalism, Gabs provides the [`StellarState`](@ref) type, which stores a state in the form $|\psi\rangle = \hat{U}|C\rangle$, where $\hat{U}$ is a Gaussian unitary and $|C\rangle$ is a normalized superposition of Fock states with finite support.
+
+```@docs; canonical = false
+StellarState
+```
+
+The core is stored as an array with one index per mode, so the amplitude of $|k_1, \ldots, k_N\rangle$ sits at `core[k₁+1, …, k_N+1]`. The Gaussian factor is a [`GaussianUnitary`](@ref), and it supplies the symplectic basis and the `ħ` convention of the stellar state, so `x.basis` and `x.ħ` are forwarded to it.
+
+The following predefined functions are supported for creating `StellarState` objects:
+- [`fockstate`](@ref)
+- [`randstellar`](@ref)
+
+A Fock state is an elementary case, with an identity Gaussian factor and a core supported on a single multi-index:
+
+```jldoctest
+julia> fockstate(QuadPairBasis(1), 2)
+StellarState for 1 mode.
+  symplectic basis: QuadPairBasis
+  stellar rank: 2
+core: 3-element Vector{ComplexF64}:
+ 0.0 + 0.0im
+ 0.0 + 0.0im
+ 1.0 + 0.0im
+displacement: 2-element Vector{Float64}:
+ 0.0
+ 0.0
+symplectic: 2×2 Matrix{Float64}:
+ 1.0  0.0
+ 0.0  1.0
+```
+
+As with [`coherentstate`](@ref), a scalar argument is applied to every mode, while a vector assigns an occupation to each mode individually:
+
+```jldoctest
+julia> basis = QuadPairBasis(3);
+
+julia> stellarrank(fockstate(basis, 2))
+6
+
+julia> stellarrank(fockstate(basis, [1, 0, 2]))
+3
+```
+
+In this formalism, photon addition and subtraction both reduce to a single question: what does a ladder
+operator become when it is pushed through the Gaussian factor? For a Gaussian
+unitary characterized by displacement vector $\mathbf{d}$, symplectic matrix $\mathbf{S}$,
+and mode operators $\hat{a}_j = (\hat{x}_j + i \hat{p}_j)/\sqrt{2\hbar}$, we have the
+transformation
+
+```math
+\hat{U}^{\dagger} \hat{a}_j^{\dagger} \hat{U} = \sum_{k} \left( \mu_{jk} \hat{a}_k^{\dagger} + \nu_{jk} \hat{a}_k \right) + \gamma_j,
+```
+
+where $\boldsymbol{\mu}$ and $\boldsymbol{\nu}$ are built from the four blocks of
+$\mathbf{S}$ and $\boldsymbol{\gamma}$ from $\mathbf{d}$, in the same convention
+$\hat{U}^{\dagger} \hat{\boldsymbol{\xi}} \hat{U} = \mathbf{S} \hat{\boldsymbol{\xi}} + \mathbf{d}$
+that [`GaussianUnitary`](@ref) stores. Symplecticity of $\mathbf{S}$ is equivalent to the
+relations $\boldsymbol{\mu}\boldsymbol{\mu}^{\dagger} - \boldsymbol{\nu}\boldsymbol{\nu}^{\dagger} = \mathbf{I}$
+and $\boldsymbol{\mu}\boldsymbol{\nu}^{\text{T}} = \boldsymbol{\nu}\boldsymbol{\mu}^{\text{T}}$
+being satisfied, the first of which shows that $\boldsymbol{\mu}$ is invertible. The
+Gaussian factor is passive when $\boldsymbol{\nu} = 0$.
+
+Its a fun little exercise to check the above formula against your favorite unitary and see how the machinery works. Take, for example the definitions in [`squeeze`](@ref) or [`displace`](@ref).
+
+!!! note
+    The decomposition $|\psi\rangle = \hat{U}|C\rangle$ is not unique. For any passive unitary $\hat{V}$, the pair $(\hat{V}|C\rangle, \hat{U}\hat{V}^{\dagger})$ describes the same state, since passive unitaries are the ones that preserve finite Fock support. Thus equality and `Base.isapprox` for `StellarState` compare the stored core and Gaussian factor, not the states they represent.
+
+### Stellar Rank
+
+The stellar rank $r$ of $|\psi\rangle = \hat{U}|C\rangle$ is the total degree of the core, i.e. the largest $|\mathbf{k}| = k_1 + \cdots + k_N$ carrying a nonzero amplitude. It is computed with [`stellarrank`](@ref). Two properties make it the natural measure of non-Gaussianity in this setting: it is invariant under every Gaussian unitary, and it vanishes exactly on the pure Gaussian states.
+
+```jldoctest
+julia> basis = QuadPairBasis(1); x = fockstate(basis, 1);
+
+julia> stellarrank(squeeze(basis, 1.0, pi/4) * x)
+1
+
+julia> isgaussian(x)
+false
+
+julia> isgaussian(fockstate(basis, 0))
+true
+```
+
+Hence, Gabs uses the following rules for type conversion. A pure [`GaussianState`](@ref) becomes a rank-zero stellar state whose Gaussian factor is the positive symmetric symplectic square root of $(2/\hbar)\mathbf{V}$, and a rank-zero stellar state becomes the Gaussian state obtained by applying its Gaussian factor to the vacuum:
+
+```jldoctest
+julia> basis = QuadPairBasis(1);
+
+julia> x = StellarState(squeezedstate(basis, 0.5, pi/4));
+
+julia> stellarrank(x)
+0
+
+julia> GaussianState(x) ≈ squeezedstate(basis, 0.5, pi/4)
+true
+```
+
+Conversion in either direction throws when the hypothesis fails: `StellarState` requires the Gaussian state to be pure, and `GaussianState` requires the stellar rank to vanish.
+
+Actions of Gaussian unitaries are called with `*` and [`apply!`](@ref), exactly as for Gaussian states, and act on the Gaussian factor alone while leaving the core untouched. Tensor products, [`embed`](@ref), and [`changebasis`](@ref) are likewise supported, and the rank is additive under `⊗`:
+
+```jldoctest
+julia> basis = QuadPairBasis(1);
+
+julia> fockstate(basis, 1) ⊗ fockstate(basis, 2) ≈ fockstate(QuadPairBasis(2), [1, 2])
+true
+
+julia> stellarrank(fockstate(basis, 1) ⊗ fockstate(basis, 2))
+3
+```
+
+!!! note
+    [`ptrace`](@ref) is not defined for stellar states. Discarding a mode of an entangled pure state produces a mixed state, which admits no decomposition of the form $\hat{U}|C\rangle$. For the same reason [`purity`](@ref) returns `1` and [`entropy_vn`](@ref) returns `0` for every `StellarState`.
+
+### Photon Addition and Subtraction
+
+Normalized photon addition and subtraction on a chosen mode are provided by [`addphoton`](@ref) and [`subtractphoton`](@ref). Both leave the Gaussian factor untouched and push the ladder operator through it, so the core absorbs $\hat{U}^{\dagger} \hat{a}_i^{\dagger} \hat{U}$ or $\hat{U}^{\dagger} \hat{a}_i \hat{U}$, whose coefficients are the $i$-th rows of the Bogoliubov equation written above.
+
+```jldoctest
+julia> basis = QuadPairBasis(1); vac = fockstate(basis, 0);
+
+julia> addphoton(vac) ≈ fockstate(basis, 1)
+true
+
+julia> stellarrank(addphoton(addphoton(vac)))
+2
+```
+
+Addition raises the rank by exactly one, since the top-degree part of the core is multiplied by the linear form $\sum_k \mu_{ik} z_k$, which is nonzero because $\boldsymbol{\mu}$ is invertible. Subtraction is not symmetric with it, and its effect on the rank is governed by row $i$ of $\boldsymbol{\nu}$ and by $\gamma_i$:
+
+| Gaussian factor at mode `index` | example | rank of `subtractphoton(x)` |
+| :---: | :---: | :---: |
+| $\nu_{i\cdot} \neq 0$ | squeezed vacuum | $r+1$ |
+| $\nu_{i\cdot} = 0$, $\gamma_i \neq 0$ | displaced Fock state | $r$ |
+| $\nu_{i\cdot} = 0$, $\gamma_i = 0$ | Fock state | $r-1$ |
+
+```jldoctest
+julia> basis = QuadPairBasis(1); vac = fockstate(basis, 0);
+
+julia> stellarrank(subtractphoton(squeeze(basis, 1.0, 0.0) * vac))
+1
+
+julia> stellarrank(subtractphoton(displace(basis, 1.0+im) * fockstate(basis, 1)))
+1
+
+julia> stellarrank(subtractphoton(fockstate(basis, 1)))
+0
+```
+
+The middle row is the statement that a coherent state is an eigenstate of the annihilation operator. That is, subtraction returns the same state up to normalization, and the rank is unchanged. The last row is the only case in which the core can shrink, and subtraction throws when it would annihilate the state, as for $\hat{a}|0\rangle$.
+
+### The Stellar Function
+
+The stellar (also called Bargmann), function of a state with Fock amplitudes $\psi_{\mathbf{k}}$ is
+
+```math
+F_{\psi}(\mathbf{z}) = \sum_{\mathbf{k}} \psi_{\mathbf{k}} \frac{\mathbf{z}^{\mathbf{k}}}{\sqrt{\mathbf{k}!}}, \quad \text{where} \quad \mathbf{z}^{\mathbf{k}} = \prod_j z_j^{k_j}, \quad \mathbf{k}! = \prod_j k_j!,
+```
+
+and is evaluated with [`stellarfunction`](@ref).
+
+```@docs; canonical = false
+stellarfunction
+```
+
+For a stellar state the sum has a closed form. Pushing the core through the Gaussian factor gives
+
+```math
+F_{\psi}(\mathbf{z}) = \mathcal{N} \exp\left( \tfrac{1}{2} \mathbf{z}^{\text{T}} \mathbf{\Sigma} \mathbf{z} + \boldsymbol{\tau}^{\text{T}} \mathbf{z} \right) p(\mathbf{z}), \qquad \mathbf{\Sigma} = \bar{\boldsymbol{\nu}} \boldsymbol{\mu}^{-1}, \quad \boldsymbol{\tau} = \bar{\boldsymbol{\gamma}} - \mathbf{\Sigma} \boldsymbol{\gamma},
+```
+
+with $p$ a polynomial of total degree $r$. The Gaussian prefactor never vanishes, so the zeros of $F_{\psi}$ are the zeros of $p$. For a single mode this is the origin of the name: the stellar rank counts the zeros of the stellar function in the complex plane, with multiplicity.
+
+```jldoctest
+julia> basis = QuadPairBasis(1); α = 1.0 + 0.5im;
+
+julia> stellarfunction(displace(basis, α) * fockstate(basis, 0), 0.4 + 0.2im)
+0.6654917625398412 + 0.2813654043279519im
+
+julia> stellarfunction(displace(basis, α) * fockstate(basis, 1), conj(α))
+0.0 + 0.0im
+```
+
+The first state is coherent, with $F(z) = e^{-|\alpha|^2/2 + \alpha z}$, which is nowhere zero and has rank zero. The second is a displaced single-photon state, with $F(z) = (z - \bar{\alpha}) e^{-|\alpha|^2/2 + \alpha z}$, whose single zero sits at $\bar{\alpha}$ and accounts for its rank of one. A squeezed vacuum, $F(z) = e^{-\tanh(r) z^2/2}/\sqrt{\cosh r}$, is again nowhere zero.
+
+!!! note
+    A [`GaussianUnitary`](@ref) records the pair $(\mathbf{d}, \mathbf{S})$ rather than a metaplectic operator, so the Gaussian factor determines $\hat{U}$ only up to a global phase and $F_{\psi}$ is fixed only up to the same phase. The gauge used here is $\mathcal{N} > 0$.

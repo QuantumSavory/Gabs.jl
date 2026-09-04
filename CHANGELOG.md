@@ -3,6 +3,27 @@
 ## Unreleased
 
 - Add `mpsstate`, converting a pure `GaussianState` into a matrix product state (MPS) in the truncated Fock basis, via `williamson`/`blochmessiah` and a Reck et al. linear-optical circuit decomposition.
+## v1.3.9 - dev
+
+- Add stellar state interface.
+
+## v1.3.8 - 2026-08-04
+
+- Normalize indexed operations to `apply!(state, indices, operation)` and support
+  indexed Gaussian channels. The former `apply!(state, operation, indices)` form
+  for Gaussian unitaries is deprecated but remains available for compatibility.
+
+## v1.3.7 - 2026-06-06
+
+- Add indexed application of a Gaussian unitary to selected modes of a state.
+
+## v1.3.6 - 2026-03-19
+
+- Allow `homodyne`, `generaldyne`, and their corresponding `rand(...)` interfaces to measure single-mode Gaussian states.
+
+## v1.3.5 - 2026-03-19
+
+- `express(gaussian_state, ::QuantumOpticsRepr)` is now implemented, letting Gabs.jl pure Gaussian states to be converted to Kets from QuantumOptics.jl
 
 ## v1.3.4 - 2026-01-05
 

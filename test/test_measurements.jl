@@ -1,6 +1,7 @@
 @testitem "Measurements" begin
     using Gabs
     using Random
+    using StableRNGs
     using StaticArrays
     using LinearAlgebra: det, I, cholesky, Symmetric
 
@@ -24,14 +25,42 @@
             gd2 = generaldyne(cohs, [1, 4], proj = epr)
             @test isapprox(gd2.result, epr, atol = 1e-12)
             @test isapprox(gd2.state, vac ⊗ vac ⊗ coh ⊗ vac, atol = 1e-12)
+
+            single = coherentstate(basis, 0.3 + 0.2im)
+            proj = squeezedstate(basis, 0.4, π / 3)
+            gd_single_int = generaldyne(single, 1; proj)
+            gd_single_vec = generaldyne(single, [1]; proj)
+            @test gd_single_int.result == proj
+            @test gd_single_vec.result == proj
+            @test gd_single_int.state == gd_single_vec.state
+            @test isapprox(gd_single_int.state, vac, atol = 1e-12)
+            @test_throws ArgumentError ptrace(gd_single_int.state, 1)
+
+            gd_rand_int = generaldyne(single, 1)
+            gd_rand_vec = generaldyne(single, [1])
+            @test gd_rand_int.result isa GaussianState
+            @test gd_rand_vec.result isa GaussianState
+            @test gd_rand_int.result.basis == basis
+            @test gd_rand_vec.result.basis == basis
+            @test isapprox(gd_rand_int.result.covar, vac.covar, atol = 1e-12)
+            @test isapprox(gd_rand_vec.result.covar, vac.covar, atol = 1e-12)
+            @test isapprox(gd_rand_int.state, vac, atol = 1e-12)
+            @test isapprox(gd_rand_vec.state, vac, atol = 1e-12)
+
+            samples_int = rand(Generaldyne, single, 1; shots = 2)
+            samples_vec = rand(Generaldyne, single, [1]; shots = 2)
+            @test size(samples_int) == size(samples_vec)
+            @test size(samples_int) == (2, 2)
         end
 
         indices, nmodes = [7, 8, 9, 10], 10
 
         # random Gaussian state tests
-        rs_qpair = randstate(QuadPairBasis(nmodes))
+        # This seed keeps VB + proj_qpair.covar well conditioned (κ₂ ≈ 11).
+        rng = StableRNG(32)
+        rs_qpair = randstate(rng, QuadPairBasis(nmodes))
         rs_qblock = changebasis(QuadBlockBasis, rs_qpair)
-        proj_qpair = randstate(QuadPairBasis(length(indices)))
+        proj_qpair = randstate(rng, QuadPairBasis(length(indices)))
         proj_qblock = changebasis(QuadBlockBasis, proj_qpair)
         gd3_qpair = generaldyne(rs_qpair, indices, proj = proj_qpair)
         gd3_qblock = generaldyne(rs_qblock, indices, proj = proj_qblock)
@@ -96,6 +125,22 @@
                 @test isapprox(state.mean[1:2], zeros(2), atol=1e-12)
                 @test isapprox(state.covar[1:2, 1:2], Matrix{Float64}(I,2,2), atol=1e-12)
             end
+
+            for basis in (qpairbasis, qblockbasis)
+                seed = 1234
+                st = coherentstate(basis, 0.3 + 0.2im)
+                h_int = homodyne(MersenneTwister(seed), st, 1, [0.0]; squeeze)
+                h_vec = homodyne(MersenneTwister(seed), st, [1], [0.0]; squeeze)
+                @test h_int.result == h_vec.result
+                @test h_int.state == h_vec.state
+                @test isapprox(h_int.state, vacuumstate(basis), atol = 1e-12)
+                @test_throws ArgumentError ptrace(h_int.state, 1)
+
+                samples_int = rand(MersenneTwister(seed), Homodyne, st, 1, [0.0]; shots = 2, squeeze)
+                samples_vec = rand(MersenneTwister(seed), Homodyne, st, [1], [0.0]; shots = 2, squeeze)
+                @test samples_int == samples_vec
+                @test size(samples_int) == (2, 2)
+            end
         
             st = squeezedstate(QuadPairBasis(4), 0.5, π/2)
             st_block = changebasis(QuadBlockBasis, st)
@@ -105,10 +150,13 @@
             @test size(rand(Homodyne, st_block, indices, angles; shots=7, squeeze)) == (4, 7)
         
             indices = [1, 2]
-            rs_qpair = randstate(QuadPairBasis(4))
+            # Keep the nearly singular finite-squeezing update reproducible.
+            # This seed gives ‖B * inv(B) - I‖∞ ≈ 1.2e-17.
+            rng = StableRNG(73)
+            rs_qpair = randstate(rng, QuadPairBasis(4))
             rs_qblock = changebasis(QuadBlockBasis, rs_qpair)
-            M_qpair = homodyne(rs_qpair, indices, [0.0, π/2])
-            M_qblock = homodyne(rs_qblock, indices, [0.0, π/2])
+            M_qpair = homodyne(rng, rs_qpair, indices, [0.0, π/2])
+            M_qblock = homodyne(rng, rs_qblock, indices, [0.0, π/2])
         
             # extract analytical conditional update
             xA, xB, VA, VB, VAB = Gabs._part_state(rs_qpair, indices)
@@ -125,7 +173,7 @@
                 B[2i,2i]     += st^2 * sq + ct^2 / sq
             end
             L = cholesky(Symmetric(B)).L
-            resultmean = L * randn(4) + xB
+            resultmean = L * randn(rng, 4) + xB
             xA′ = xA .+ VAB * (inv(B) * (resultmean - xB))
             VA′ = VA .- VAB * (inv(B) * transpose(VAB))
         
@@ -172,6 +220,6 @@
 
             @test_throws ArgumentError rand(Homodyne, rs_qpair, collect(1:5), [0.0])
             @test_throws ArgumentError rand(Homodyne, rs_qblock, collect(1:5), [π/2])
-        end        
+        end
     end
 end

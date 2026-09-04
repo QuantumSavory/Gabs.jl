@@ -625,6 +625,21 @@ function _tensor(op1::GaussianUnitary{B1,D1,S1}, op2::GaussianUnitary{B2,D2,S2})
     return disp′′, symp′′
 end
 
+"""
+    inv(op::GaussianUnitary)
+
+Inverse in the group law `(d₁,S₁)*(d₂,S₂) = (S₁d₂+d₁, S₁S₂)`. The symplectic factor is
+inverted as `S⁻¹ = ΩSᵀΩᵀ`, which is exact and preserves `SΩSᵀ = Ω`.
+"""
+function Base.inv(op::GaussianUnitary)
+    Omega = symplecticform(op.basis)
+    symp = Omega * transpose(op.symplectic) * transpose(Omega)
+    disp = -(symp * op.disp)
+    disp′ = _promote_output_vector(typeof(op.disp), disp, length(disp))
+    symp′ = _promote_output_matrix(typeof(op.symplectic), symp, size(symp))
+    return GaussianUnitary(op.basis, disp′, symp′; ħ = op.ħ)
+end
+
 ##
 # Embedding Gaussian unitaries
 ##

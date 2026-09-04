@@ -109,6 +109,56 @@ function _randchannel(rng::AbstractRNG, basis::SymplecticBasis{N}) where {N<:Int
 end
 
 """
+    randstellar([Tc=Array{ComplexF64},] basis::SymplecticBasis, rank::Int;
+                passive=false, ħ=2, rng=Random.default_rng())
+
+Random stellar state of the given rank. Takes the form of a random core 
+supported on multi-indices of total degree at most `rank`, 
+together with `randunitary`.
+"""
+function randstellar(::Type{Tc}, basis::SymplecticBasis{N}, rank::Int;
+                     passive = false, ħ = 2, rng::AbstractRNG = Random.default_rng()) where {Tc,N<:Int}
+    core, op = _randstellar(rng, basis, rank; passive = passive, ħ = ħ)
+    return StellarState(Tc(core), op)
+end
+function randstellar(basis::SymplecticBasis{N}, rank::Int;
+                     passive = false, ħ = 2, rng::AbstractRNG = Random.default_rng()) where {N<:Int}
+    core, op = _randstellar(rng, basis, rank; passive = passive, ħ = ħ)
+    return StellarState(core, op)
+end
+randstellar(rng::AbstractRNG, basis::SymplecticBasis{N}, rank::Int; passive = false, ħ = 2) where {N<:Int} =
+    randstellar(basis, rank; passive = passive, ħ = ħ, rng = rng)
+function _randstellar(
+    rng::AbstractRNG, 
+    basis::SymplecticBasis{N}, 
+    rank::Int;
+    passive = false, 
+    ħ = 2
+) where {N<:Int}
+    rank ≥ 0 || throw(ArgumentError(lazy"The stellar rank must be a nonnegative integer."))
+    n = basis.nmodes
+    core = zeros(ComplexF64, ntuple(_ -> rank + 1, n))
+    @inbounds for I in CartesianIndices(core)
+        sum(Tuple(I)) - n ≤ rank && (core[I] = randn(rng, ComplexF64))
+    end
+    core ./= sqrt(sum(abs2, core))
+    return _trimcore(core), randunitary(basis; passive = passive, ħ = ħ, rng = rng)
+end
+
+# drop trailing all-zero slices so repeated ladder actions do not inflate the core
+function _trimcore(core::AbstractArray{T,N}) where {T,N}
+    dims = collect(size(core))
+    @inbounds for k in Base.OneTo(N)
+        while dims[k] > 1
+            slice = ntuple(j -> j == k ? (dims[k]:dims[k]) : (1:dims[j]), N)
+            any(!iszero, @view core[slice...]) && break
+            dims[k] -= 1
+        end
+    end
+    return core[ntuple(j -> 1:dims[j], N)...]
+end
+
+"""
     randsymplectic([T=Matrix{Float64},] basis::SymplecticBasis, passive=false, rng=Random.default_rng())
 
 Calculate a random symplectic matrix in symplectic representation defined by `basis`.

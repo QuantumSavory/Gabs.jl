@@ -8,22 +8,34 @@ on:
     branches: [master, main]
     paths-ignore:
       - 'docs/**'
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 env:
-  PYTHON: ~
+  QUANTUMSAVORY_DOWNGRADE_TEST: "true"
+
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        version: ['1.10']
     steps:
-      - uses: actions/checkout@v5
-      - uses: julia-actions/setup-julia@v1
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
         with:
-          version: ${{ matrix.version }}
-      - uses: cjdoris/julia-downgrade-compat-action@v1
+          version: '1.12'
+      - uses: julia-actions/cache@v3
         with:
-          skip: Pkg,TOML,InteractiveUtils,Random,LinearAlgebra
-      - uses: julia-actions/cache@v2
+          delete-old-caches: false
+      - uses: julia-actions/julia-downgrade-compat@v2.7.0
+        with:
+          projects: '.,test'
+          skip: LinearAlgebra,Random
+          mode: 'forcedeps'
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        with:
+          allow_reresolve: false
+          force_latest_compatible_version: false

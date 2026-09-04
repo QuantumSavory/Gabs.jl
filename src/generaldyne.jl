@@ -82,7 +82,7 @@ function generaldyne(state::GaussianState{<:QuadPairBasis,Tm,Tc}, indices::R;
 	basis = state.basis
 	nmodes = basis.nmodes
 	indlength = length(indices)
-	indlength < nmodes || throw(ArgumentError(INDEX_ERROR))
+	indlength <= nmodes || throw(ArgumentError(INDEX_ERROR))
 	if proj isa Matrix
 		2*indlength == size(proj)[1] == size(proj)[2] || throw(ArgumentError(GENERALDYNE_ERROR))
 	elseif proj isa GaussianState
@@ -117,7 +117,7 @@ function generaldyne(state::GaussianState{<:QuadBlockBasis,Tm,Tc}, indices::R;
 	basis = state.basis
 	nmodes = basis.nmodes
 	indlength = length(indices)
-	indlength < nmodes || throw(ArgumentError(INDEX_ERROR))
+	indlength <= nmodes || throw(ArgumentError(INDEX_ERROR))
 	if proj isa Matrix
 		2*indlength == size(proj)[1] == size(proj)[2] || throw(ArgumentError(GENERALDYNE_ERROR))
 	elseif proj isa GaussianState
@@ -170,7 +170,7 @@ function Base.rand(::Type{Generaldyne}, state::GaussianState{<:QuadPairBasis,Tm,
 	basis = state.basis
 	indlength = length(indices)
 	nmodes′ = basis.nmodes - indlength
-	indlength < basis.nmodes || throw(ArgumentError(INDEX_ERROR))
+	indlength <= basis.nmodes || throw(ArgumentError(INDEX_ERROR))
 	2*indlength == size(proj)[1] == size(proj)[2] || throw(ArgumentError(GENERALDYNE_ERROR))
 	mean, covar = state.mean, state.covar
 	# write mean and covariance matrix of measured modes to vector `b` and matrix `B`, respectively
@@ -205,7 +205,7 @@ function Base.rand(::Type{Generaldyne}, state::GaussianState{<:QuadBlockBasis,Tm
 	nmodes = basis.nmodes
 	indlength = length(indices)
 	nmodes′ = nmodes - indlength
-	indlength < nmodes || throw(ArgumentError(INDEX_ERROR))
+	indlength <= nmodes || throw(ArgumentError(INDEX_ERROR))
 	2*indlength == size(proj)[1] == size(proj)[2] || throw(ArgumentError(GENERALDYNE_ERROR))
 	mean, covar = state.mean, state.covar
 	# write mean and covariance matrix of measured modes to vector `b` and matrix `B`, respectively

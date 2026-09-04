@@ -38,7 +38,8 @@ function main()
     )
 
     deploydocs(
-        repo = "github.com/apkille/Gabs.jl.git"
+        repo = "github.com/QuantumSavory/Gabs.jl.git",
+        push_preview = true,
     )
 end
 

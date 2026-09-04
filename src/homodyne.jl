@@ -85,7 +85,7 @@ function homodyne(
     basis = state.basis
     nmodes = basis.nmodes
     indlength = length(indices)
-    indlength < nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
+    indlength <= nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
     # perform conditional mapping of Gaussian quantum state
     result′, a, A = _homodyne_filter(rng, state, indices, angles; squeeze)
@@ -124,7 +124,7 @@ function homodyne(
     basis = state.basis
     nmodes = basis.nmodes
     indlength = length(indices)
-    indlength < nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
+    indlength <= nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
     # perform conditional mapping of Gaussian quantum state
     result′, a, A = _homodyne_filter(rng, state, indices, angles; squeeze)
@@ -203,7 +203,7 @@ function Base.rand(
 ) where {Tm,Tc,R,G}
     basis = state.basis
     indlength = length(indices)
-    indlength < basis.nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
+    indlength <= basis.nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
     nmodes′ = basis.nmodes - indlength
     mean, covar = state.mean, state.covar
@@ -266,7 +266,7 @@ function Base.rand(
     basis = state.basis
     nmodes = basis.nmodes
     indlength = length(indices)
-    indlength < nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
+    indlength <= nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
     nmodes′ = nmodes - indlength
     mean, covar = state.mean, state.covar
