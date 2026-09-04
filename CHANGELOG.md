@@ -1,5 +1,9 @@
 # News
 
+## Unreleased
+
+- Add `mpsstate`, converting a pure `GaussianState` into a matrix product state (MPS) in the truncated Fock basis, via `williamson`/`blochmessiah` and a Reck et al. linear-optical circuit decomposition.
+
 ## v1.3.4 - 2026-01-05
 
 - Add optional rng arguments to random methods.

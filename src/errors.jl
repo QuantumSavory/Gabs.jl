@@ -35,3 +35,15 @@ HBAR_ERROR = lazy"There are at least two different conventions for `ħ` used in 
     that each Gaussian object has the same convention for `ħ`."
 
 INDEX_ERROR = lazy"The provided indices must all be positive integer values that are no greater than the number of modes encompassed within the Gaussian state."
+
+MPS_EXT_ERROR = lazy"`mpsstate` requires the ITensors.jl and ITensorMPS.jl package extension.
+    Run `using ITensors, ITensorMPS` (in addition to `using Gabs`) to enable it."
+
+MPS_MIXED_STATE_ERROR = lazy"`mpsstate` currently only supports pure Gaussian states
+    (purity ≈ 1). Mixed-state support via purification is not yet implemented."
+
+MPS_BLOCHMESSIAH_ERROR = lazy"`mpsstate` could not build a valid linear-optical circuit for
+    this state: `blochmessiah` (SymplecticMatrices.jl) returned a passive transformation
+    that is not itself symplectic, a known numerical limitation for some multi-mode
+    Gaussian states. This is not a property of the input state; retrying is unlikely to
+    help. See the `mpsstate` docstring for details."

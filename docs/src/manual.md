@@ -485,3 +485,46 @@ issymplectic(QuadBlockBasis(1), S, atol = 1e-12)
 ```
 In the last line of code, we used the symplectic check [`issymplectic`](@ref). In general, we can
 check if a state or operator is Gaussian with [`isgaussian`](@ref).
+
+## Matrix Product State Representations
+
+For large, weakly-entangled continuous-variable systems, a matrix product state (MPS) in a
+truncated Fock basis can be a far more efficient representation than the exponentially-sized
+Fock-space state vector. [`mpsstate`](@ref) converts a **pure** [`GaussianState`](@ref) into
+an MPS, following Nüßeler, Dhand, Huelga, and Plenio, *Phys. Rev. A* **104**, 012415 (2021):
+the state's [`williamson`](@ref) decomposition gives a symplectic matrix connecting it to the
+vacuum, which is [`blochmessiah`](@ref)-decomposed into passive (beam-splitter/phase-shifter)
+and active (single-mode squeezing) linear-optical layers; each layer is applied, as a circuit
+of Fock-basis gates, to the vacuum product-state MPS, with SVD-based bond-dimension
+truncation after every gate (the same MPO/MPS gate-application methodology used for dynamics
+by Yanagimoto, Ng, Wright, Onodera, and Mabuchi, *Optica* **8**, 1306 (2021)).
+
+This functionality lives in a package extension and requires
+[ITensors.jl](https://github.com/ITensor/ITensors.jl) and
+[ITensorMPS.jl](https://github.com/ITensor/ITensorMPS.jl):
+
+```julia
+using Gabs, ITensors, ITensorMPS
+
+basis = QuadPairBasis(1)
+state = squeezedstate(basis, 0.5, 0.0) ⊗ squeezedstate(basis, 0.3, 0.7)
+psi = mpsstate(state; cutoff = 20) # local Fock-space truncation per mode
+inner(psi, psi) # ≈ 1
+```
+
+```@docs; canonical = false
+mpsstate
+```
+
+!!! note
+    Only pure Gaussian states are currently supported — mixed states require purification,
+    which is not yet implemented, nor are non-Gaussian states
+    (e.g. [`GaussianLinearCombination`](@ref)).
+
+!!! warning
+    `SymplecticMatrices.jl`'s `blochmessiah` has been observed to occasionally return a
+    passive transformation that is not itself symplectic for certain multi-mode states
+    reached via [`williamson`](@ref) — entangled states such as [`eprstate`](@ref) reproduce
+    this reliably, while independent per-mode products of single-mode states do not.
+    `mpsstate` detects this and raises an informative error rather than silently returning
+    an incorrect state. Single-mode states are unaffected.

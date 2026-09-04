@@ -40,8 +40,10 @@ export
     purity, entropy_vn, fidelity, logarithmic_negativity,
     cross_wigner, cross_wignerchar,
     # additional interface
-    nmodes
-    
+    nmodes,
+    # tensor-network representations
+    mpsstate
+
 include("errors.jl")
 
 include("utils.jl")
@@ -73,5 +75,7 @@ include("metrics.jl")
 include("linearcombinations.jl")
 
 include("nongaussian_states.jl")
+
+include("mps.jl")
 
 end
