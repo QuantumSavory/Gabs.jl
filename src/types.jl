@@ -115,9 +115,11 @@ end
 function Base.:(*)(op::GaussianUnitary, state::GaussianState)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
-    d, S, = op.disp, op.symplectic
-    mean′ = S * state.mean .+ d
-    covar′ = S * state.covar * transpose(S)
+    # the operator and the state need not start on the same device
+    S, covar = _codevice(op.symplectic, state.covar)
+    d, mean = _codevice(op.disp, state.mean)
+    mean′ = S * mean .+ d
+    covar′ = S * covar * transpose(S)
     return GaussianState(state.basis, mean′, covar′; ħ = state.ħ)
 end
 """
@@ -128,7 +130,9 @@ In-place application of a Gaussian unitary `op` on a Gaussian state `state`.
 function apply!(state::GaussianState, op::GaussianUnitary)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
-    d, S = op.disp, op.symplectic
+    # the state is written in place, so the operator is the one that moves
+    _, S = _codevice(state.covar, op.symplectic)
+    _, d = _codevice(state.mean, op.disp)
     state.mean .= S * state.mean .+ d
     state.covar .= S * state.covar * transpose(S)
     return state
@@ -258,9 +262,11 @@ nmodes(x::GaussianChannel) = nmodes(x.basis)
 function Base.:(*)(op::GaussianChannel, state::GaussianState)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
-    d, T, N = op.disp, op.transform, op.noise
-    mean′ = T * state.mean .+ d
-    covar′ = T * state.covar * transpose(T) .+ N
+    T, covar = _codevice(op.transform, state.covar)
+    d, mean = _codevice(op.disp, state.mean)
+    N = _like(covar, op.noise)
+    mean′ = T * mean .+ d
+    covar′ = T * covar * transpose(T) .+ N
     return GaussianState(state.basis, mean′, covar′; ħ = state.ħ)
 end
 """
@@ -274,7 +280,9 @@ Gaussian state `state`.
 function apply!(state::GaussianState, op::GaussianChannel)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
-    d, T, N = op.disp, op.transform, op.noise
+    _, T = _codevice(state.covar, op.transform)
+    _, d = _codevice(state.mean, op.disp)
+    N = _like(state.covar, op.noise)
     state.mean .= T * state.mean .+ d
     state.covar .= T * state.covar * transpose(T) .+ N
     return state

@@ -110,6 +110,25 @@
             @test ongpu(sc ⊗ sg2)
         end
 
+        @testset "$(nameof(B)): operands on different devices" begin
+            # An operator and a state need not start on the same device. The
+            # result belongs on the device, and has to equal the CPU answer.
+            ref = uc * sc
+            @test samemoments(ref, uc * sg)
+            @test samemoments(ref, ug * sc)
+            refc = cc * sc
+            @test samemoments(refc, cc * sg)
+            @test samemoments(refc, cg * sc)
+            @test samemoments(ref, apply!(copy(sg), uc))
+            @test samemoments(refc, apply!(copy(sg), cc))
+
+            # and through a linear combination, which delegates per state
+            lcc = GaussianLinearCombination(b1, [0.6, -0.8], [sc, sc2])
+            lcg = GaussianLinearCombination(b1, [0.6, -0.8], [sg, sg2])
+            @test samemoments((uc * lcc).states[1], (uc * lcg).states[1])
+            @test samemoments((cc * lcc).states[1], (cc * lcg).states[1])
+        end
+
         @testset "$(nameof(B)): metrics and phase space" begin
             @test purity(tg) ≈ purity(tc)
             @test entropy_vn(tg) ≈ entropy_vn(tc) atol = 1e-10
