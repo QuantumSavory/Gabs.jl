@@ -129,6 +129,28 @@
             @test wignerchar(tg, CuVector{Float64}(x)) ≈ wignerchar(tc, x)
         end
 
+        @testset "$(nameof(B)): batched phase-space evaluation" begin
+            # A grid of points is the case worth sending to a device, and the
+            # answer has to be the CPU's.
+            xs = randn(6, 32)
+            xg = CuMatrix{Float64}(xs)
+            @test Array(wigner(tg, xg)) ≈ wigner(tc, xs)
+            @test Array(wignerchar(tg, xg)) ≈ wignerchar(tc, xs)
+            @test wigner(tg, xg) isa CuVector
+            @test wignerchar(tg, xg) isa CuVector
+
+            u1 = sc ⊗ sc2 ⊗ sc2
+            v1 = sg ⊗ sg2 ⊗ sg2
+            @test Array(cross_wigner(tg, v1, xg)) ≈ cross_wigner(tc, u1, xs)
+            @test Array(cross_wignerchar(tg, v1, xg)) ≈ cross_wignerchar(tc, u1, xs)
+
+            lcc = GaussianLinearCombination(tc.basis, [0.6, -0.8], [tc, u1])
+            lcg = GaussianLinearCombination(tg.basis, [0.6, -0.8], [tg, v1])
+            @test Array(wigner(lcg, xg)) ≈ wigner(lcc, xs)
+            @test Array(wignerchar(lcg, xg)) ≈ wignerchar(lcc, xs)
+            @test wigner(lcg, xg) isa CuVector
+        end
+
         @testset "$(nameof(B)): random objects" begin
             @test ongpu(randstate(CV, CM, b2))
             @test ongpu(randstate(CV, CM, b2; pure = true))

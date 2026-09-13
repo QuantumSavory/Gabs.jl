@@ -5,6 +5,9 @@
 - Add a CUDA extension: `CuArray`s can be given to any predefined state,
   unitary or channel the way other custom array types can, and operations on
   them keep their results on the device.
+- `wigner`, `wignerchar`, `cross_wigner` and `cross_wignerchar` accept a matrix
+  of phase-space points and return one value per column, sharing a single
+  factorization of the covariance across the set.
 - Add stellar state interface.
 
 ## v1.3.8 - 2026-08-04

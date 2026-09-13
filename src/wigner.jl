@@ -17,6 +17,66 @@ function wigner(state::GaussianState, x::T) where {T}
 end
 
 """
+    wigner(state::GaussianState, xs::AbstractMatrix)
+
+Wigner function of an N-mode Gaussian state at each column of `xs`, a `2N × M`
+matrix of phase-space points. Returns a vector of length `M`.
+
+Evaluating a set of points together shares the one factorization of the
+covariance between them and leaves the per-point work as a single matrix
+product, rather than repeating a `2N × 2N` solve for every point. This is the
+form to use for a phase-space grid, and the form that has something for a GPU
+to do.
+
+## Example
+
+```jldoctest
+julia> state = coherentstate(QuadPairBasis(1), 1.0+im);
+
+julia> xs = [0.0 2.0; 0.0 2.0];
+
+julia> wigner(state, xs) ≈ [wigner(state, xs[:, 1]), wigner(state, xs[:, 2])]
+true
+```
+"""
+function wigner(state::GaussianState, xs::AbstractMatrix)
+    basis = state.basis
+    nmodes = basis.nmodes
+    mean = state.mean
+    size(xs, 1) == length(mean) || throw(ArgumentError(WIGNER_ERROR))
+
+    V = state.covar
+    diff = xs .- mean
+    # sum over the quadratures of each column, leaving one exponent per point
+    args = -(1/2) .* vec(sum(diff .* (V \ diff); dims = 1))
+
+    return exp.(args) ./ ((2pi)^nmodes * sqrt(_det(V)))
+end
+
+"""
+    wignerchar(state::GaussianState, xis::AbstractMatrix)
+
+Wigner characteristic function of an N-mode Gaussian state at each column of
+`xis`, a `2N × M` matrix. Returns a vector of length `M`. See
+[`wigner(::GaussianState, ::AbstractMatrix)`](@ref) on why the batched form
+exists.
+"""
+function wignerchar(state::GaussianState, xis::AbstractMatrix)
+    basis = state.basis
+    mean = state.mean
+    size(xis, 1) == length(mean) || throw(ArgumentError(WIGNER_ERROR))
+
+    V = state.covar
+    Omega = _symplecticform(basis, V)
+    M = Omega * V * transpose(Omega)
+
+    args1 = -(1/2) .* vec(sum(xis .* (M * xis); dims = 1))
+    args2 = im .* vec(transpose(Omega * mean) * xis)
+
+    return exp.(args1 .- args2)
+end
+
+"""
     wigner(x::StellarState, xi)
 
 Wigner function of a stellar state. A Gaussian unitary acts on phase space by `ξ → Sξ + d`

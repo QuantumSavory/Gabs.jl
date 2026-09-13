@@ -619,6 +619,35 @@ function cross_wigner(state1::GaussianState, state2::GaussianState, x::AbstractV
 end
 
 """
+    cross_wigner(state1::GaussianState, state2::GaussianState, xs::AbstractMatrix)
+
+Cross-Wigner function at each column of `xs`, a `2N × M` matrix of phase-space
+points. Returns a vector of length `M`.
+
+As for [`wigner`](@ref), evaluating the points together reuses the one
+factorization of the averaged covariance and leaves a single matrix product per
+term.
+"""
+function cross_wigner(state1::GaussianState, state2::GaussianState, xs::AbstractMatrix)
+    state1.basis == state2.basis || throw(ArgumentError(SYMPLECTIC_ERROR))
+    state1.ħ == state2.ħ || throw(ArgumentError(HBAR_ERROR))
+    size(xs, 1) == length(state1.mean) || throw(ArgumentError(WIGNER_ERROR))
+    μ1, μ2 = state1.mean, state2.mean
+    n = length(μ1) ÷ 2
+    ħ = state1.ħ
+    Vavg = (state1.covar .+ state2.covar) ./ 2
+    Ω = _symplecticform(state1.basis, Vavg)
+    dx = xs .- (μ1 .+ μ2) ./ 2
+    quad = vec(sum(dx .* (Vavg \ dx); dims = 1))
+    phase_arg = vec(transpose(Ω * (μ1 .- μ2)) * dx)
+    lognorm = -n*log(2π) - 0.5*_logdet(Vavg)
+    # `Ω` is antisymmetric, so contracting `Δμ` through it on the left as
+    # `(ΩΔμ)ᵀdx` is the negation of the single-point form's `Δμᵀ Ω dx`; the sign
+    # on the phase compensates
+    return exp(lognorm) .* exp.(-0.5 .* quad) .* cis.(.-phase_arg ./ ħ)
+end
+
+"""
     wigner(lc::GaussianLinearCombination, x::AbstractVector)
 
 Compute Wigner function of a linear combination including quantum interference.
@@ -634,6 +663,31 @@ function wigner(lc::GaussianLinearCombination, x::AbstractVector)
             cj, sj = lc[j]
             cross_term = 2 * real(conj(ci) * cj * cross_wigner(si, sj, x))
             result += cross_term
+        end
+    end
+    return result
+end
+
+"""
+    wigner(lc::GaussianLinearCombination, xs::AbstractMatrix)
+
+Wigner function of a linear combination, including interference, at each column
+of `xs`. Returns a vector of length `size(xs, 2)`.
+
+The pairwise sum costs `length(lc)^2` terms whatever the number of points, so
+batching amortizes it over the whole grid at once.
+"""
+function wigner(lc::GaussianLinearCombination, xs::AbstractMatrix)
+    size(xs, 1) == length(lc.states[1].mean) || throw(ArgumentError(WIGNER_ERROR))
+    # seeded from the first term so the accumulator lives wherever the states do
+    c1, s1 = lc[1]
+    result = abs2(c1) .* wigner(s1, xs)
+    @inbounds for i in 1:length(lc)
+        ci, si = lc[i]
+        i > 1 && (result .+= abs2(ci) .* wigner(si, xs))
+        for j in (i+1):length(lc)
+            cj, sj = lc[j]
+            result .+= 2 .* real.(conj(ci) * cj .* cross_wigner(si, sj, xs))
         end
     end
     return result
@@ -672,6 +726,47 @@ function cross_wignerchar(state1::GaussianState, state2::GaussianState, xi::Abst
     mul!(temp_vec, Omega, μ12)              
     arg2 = 1im * dot(temp_vec, xi)
     return exp(arg1 - arg2)
+end
+
+"""
+    cross_wignerchar(state1::GaussianState, state2::GaussianState, xis::AbstractMatrix)
+
+Cross-Wigner characteristic function at each column of `xis`. Returns a vector
+of length `size(xis, 2)`.
+"""
+function cross_wignerchar(state1::GaussianState, state2::GaussianState, xis::AbstractMatrix)
+    state1.basis == state2.basis || throw(ArgumentError(SYMPLECTIC_ERROR))
+    state1.ħ == state2.ħ || throw(ArgumentError(HBAR_ERROR))
+    size(xis, 1) == length(state1.mean) || throw(ArgumentError(WIGNER_ERROR))
+    μ12 = (state1.mean .+ state2.mean) ./ 2
+    V12 = (state1.covar .+ state2.covar) ./ 2
+    Ω = _symplecticform(state1.basis, V12)
+    M = -(Ω * V12 * Ω)
+    args1 = -(1/2) .* vec(sum(xis .* (M * xis); dims = 1))
+    args2 = im .* vec(transpose(Ω * μ12) * xis)
+    return exp.(args1 .- args2)
+end
+
+"""
+    wignerchar(lc::GaussianLinearCombination, xis::AbstractMatrix)
+
+Wigner characteristic function of a linear combination, including interference,
+at each column of `xis`.
+"""
+function wignerchar(lc::GaussianLinearCombination, xis::AbstractMatrix)
+    size(xis, 1) == length(lc.states[1].mean) || throw(ArgumentError(WIGNER_ERROR))
+    # seeded from the first term so the accumulator lives wherever the states do
+    c1, s1 = lc[1]
+    result = complex.(abs2(c1) .* wignerchar(s1, xis))
+    @inbounds for i in 1:length(lc)
+        ci, si = lc[i]
+        i > 1 && (result .+= abs2(ci) .* wignerchar(si, xis))
+        for j in (i+1):length(lc)
+            cj, sj = lc[j]
+            result .+= 2 .* real.(conj(ci) * cj .* cross_wignerchar(si, sj, xis))
+        end
+    end
+    return result
 end
 
 """

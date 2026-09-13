@@ -214,13 +214,39 @@ A host operand mixed with a device one is moved to the device, so
 `state ⊗ cpu_state` also returns a GPU-backed state. To bring a result back,
 convert its fields with `Array`.
 
+### Evaluating many phase-space points
+
+[`wigner`](@ref) and [`wignerchar`](@ref) also take a `2N × M` matrix whose
+columns are points, and return one value per column. This is the form to use for
+a phase-space grid: the covariance is factorized once for the whole set instead
+of once per point, which is worth doing on the CPU and is what gives a GPU
+enough work to be worth the trip.
+
+```julia
+julia> grid = reduce(hcat, [[x, p] for x in -3:0.05:3, p in -3:0.05:3]);
+
+julia> w = wigner(state, CuMatrix{Float32}(grid));   # one value per column
+```
+
+The same applies to [`cross_wigner`](@ref) and to a
+[`GaussianLinearCombination`](@ref), where the interference sum runs over
+`length(lc)^2` pairs at every point.
+
 !!! note
-    Moving to the GPU pays off once the covariance matrices are large enough to
-    hide the cost of launching a kernel. On an RTX 2080 Ti, applying a Gaussian
-    unitary to a state breaks even at roughly 64 modes and is about 85× faster
-    at 1024; below about 32 modes the CPU is quicker. The same holds for drawing
-    measurement samples, where the gain comes from asking for many shots at once
-    (about 7× at 10⁴ shots) rather than from any single sample being faster.
+    Moving to the GPU pays off once there is enough work to hide the cost of
+    launching a kernel. Measured on an RTX 2080 Ti:
+
+    - Applying a Gaussian unitary breaks even near 64 modes and is about 85×
+      faster at 1024; below about 32 modes the CPU is quicker.
+    - Batched `wigner` over 25,000 points is about 2.6× the batched CPU call
+      (36× a per-point loop). For a 2-state interference Wigner over 50,000
+      points it is about 5× the batched CPU call, 73× the loop.
+    - Drawing measurement samples gains from asking for many shots at once,
+      about 7× at 10⁴ shots.
+
+    Note the two baselines. Most of the distance from a per-point loop is won by
+    batching itself, which helps the CPU just as much; the device then adds
+    roughly another 3–6× on top at these sizes.
 
 ## Multithreading
 
