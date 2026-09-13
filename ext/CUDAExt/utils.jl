@@ -3,34 +3,35 @@
 # `tensor` and `ptrace` compute into a plain `Array` and then ask which container
 # the result should live in. `promote_type(CuVector{T}, Vector{T})` is `Any`, so
 # the mixed pairs need their own methods rather than falling through to the
-# generic one.
+# generic one. The output argument is annotated so the three-argument form and
+# the `(type, output, size)` form cannot overlap.
 
-Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out) where {T1<:CuVector,T2<:CuVector}
+Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out::AbstractVector) where {T1<:CuVector,T2<:CuVector}
     return CuVector{promote_type(eltype(T1), eltype(T2))}(vec_out)
 end
-Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out) where {T1<:CuVector,T2<:AbstractVector}
+Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out::AbstractVector) where {T1<:CuVector,T2<:AbstractVector}
     return CuVector{promote_type(eltype(T1), eltype(T2))}(vec_out)
 end
-Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out) where {T1<:AbstractVector,T2<:CuVector}
+Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out::AbstractVector) where {T1<:AbstractVector,T2<:CuVector}
     return CuVector{promote_type(eltype(T1), eltype(T2))}(vec_out)
 end
-Base.@propagate_inbounds function _promote_output_vector(::Type{T}, vec_out, vec_length::Int) where {T<:CuVector}
+Base.@propagate_inbounds function _promote_output_vector(::Type{T}, vec_out::AbstractVector, vec_length::Int) where {T<:CuVector}
     return CuVector{eltype(T)}(vec_out)
 end
 
-Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out) where {T1<:CuMatrix,T2<:CuMatrix}
+Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out::AbstractMatrix) where {T1<:CuMatrix,T2<:CuMatrix}
     return CuMatrix{promote_type(eltype(T1), eltype(T2))}(mat_out)
 end
-Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out) where {T1<:CuMatrix,T2<:AbstractMatrix}
+Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out::AbstractMatrix) where {T1<:CuMatrix,T2<:AbstractMatrix}
     return CuMatrix{promote_type(eltype(T1), eltype(T2))}(mat_out)
 end
-Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out) where {T1<:AbstractMatrix,T2<:CuMatrix}
+Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out::AbstractMatrix) where {T1<:AbstractMatrix,T2<:CuMatrix}
     return CuMatrix{promote_type(eltype(T1), eltype(T2))}(mat_out)
 end
-Base.@propagate_inbounds function _promote_output_matrix(::Type{T}, mat_out, out_dim::Int) where {T<:CuMatrix}
+Base.@propagate_inbounds function _promote_output_matrix(::Type{T}, mat_out::AbstractMatrix, out_dim::Int) where {T<:CuMatrix}
     return CuMatrix{eltype(T)}(mat_out)
 end
-Base.@propagate_inbounds function _promote_output_matrix(::Type{T}, mat_out, out_dim::Tuple) where {T<:CuMatrix}
+Base.@propagate_inbounds function _promote_output_matrix(::Type{T}, mat_out::AbstractMatrix, out_dim::Tuple) where {T<:CuMatrix}
     return CuMatrix{eltype(T)}(mat_out)
 end
 

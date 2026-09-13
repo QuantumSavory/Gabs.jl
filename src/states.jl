@@ -515,6 +515,7 @@ function _directsummoments(mean1, covar1, mean2, covar2, perm)
     return mean′′, covar′′
 end
 
+# `[A 0; 0 B]`, allocated from `A` so the result keeps its array type.
 function _blockdiag(A, B, n1::Int, n2::Int)
     A′, B′ = _codevice(A, B)
     T = promote_type(eltype(A′), eltype(B′))
@@ -629,10 +630,29 @@ end
 # one indexing expression serves both bases and every array backend.
 function _gathermoments(mean, covar, quad)
     mean′ = mean[quad]
-    covar′ = covar[quad, quad]
+    covar′ = _gathersquare(covar, quad)
     mean′′ = _promote_output_vector(typeof(mean), mean′, length(quad))
     covar′′ = _promote_output_matrix(typeof(covar), covar′, length(quad))
     return mean′′, covar′′
+end
+
+# `A[q, q]` for a symmetric `A`. The generic form is one indexing expression,
+# which every array backend understands.
+_gathersquare(A, quad) = A[quad, quad]
+# On a host `Array`, walking the result in column order and reading
+# through a column view beats the generic two-dimensional index. Filling only one
+# triangle and mirroring it is slower despite halving the reads: the mirrored
+# write lands in a different column each time.
+function _gathersquare(A::Array, quad)
+    m = length(quad)
+    out = similar(A, m, m)
+    @inbounds for jj in Base.OneTo(m)
+        col = @view A[:, quad[jj]]
+        for ii in Base.OneTo(m)
+            out[ii, jj] = col[quad[ii]]
+        end
+    end
+    return out
 end
 
 ptrace(::StellarState, ::Int) = throw(ArgumentError(STELLAR_PTRACE_ERROR))
@@ -782,12 +802,12 @@ covariance: 4×4 Matrix{Float64}:
 function changebasis(::Type{B1}, state::GaussianState{B2,M,V}) where {B1<:QuadBlockBasis,B2<:QuadPairBasis,M,V}
     nmodes = state.basis.nmodes
     p = _basisperm(B1, nmodes)
-    return GaussianState(B1(nmodes), state.mean[p], state.covar[p, p]; ħ = state.ħ)
+    return GaussianState(B1(nmodes), _permute(state.mean, p), _permutesquare(state.covar, p); ħ = state.ħ)
 end
 function changebasis(::Type{B1}, state::GaussianState{B2,M,V}) where {B1<:QuadPairBasis,B2<:QuadBlockBasis,M,V}
     nmodes = state.basis.nmodes
     p = _basisperm(B1, nmodes)
-    return GaussianState(B1(nmodes), state.mean[p], state.covar[p, p]; ħ = state.ħ)
+    return GaussianState(B1(nmodes), _permute(state.mean, p), _permutesquare(state.covar, p); ħ = state.ħ)
 end
 changebasis(::Type{<:QuadBlockBasis}, state::GaussianState{<:QuadBlockBasis,M,V}) where {M,V} = state
 changebasis(::Type{<:QuadPairBasis}, state::GaussianState{<:QuadPairBasis,M,V}) where {M,V} = state

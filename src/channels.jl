@@ -367,12 +367,12 @@ noise: 4×4 Matrix{Float64}:
 function changebasis(::Type{B1}, op::GaussianChannel{B2,D,S}) where {B1<:QuadBlockBasis,B2<:QuadPairBasis,D,S}
     nmodes = op.basis.nmodes
     p = _basisperm(B1, nmodes)
-    return GaussianChannel(B1(nmodes), op.disp[p], op.transform[p, p], op.noise[p, p]; ħ = op.ħ)
+    return GaussianChannel(B1(nmodes), _permute(op.disp, p), _permutesquare(op.transform, p), _permutesquare(op.noise, p); ħ = op.ħ)
 end
 function changebasis(::Type{B1}, op::GaussianChannel{B2,D,S}) where {B1<:QuadPairBasis,B2<:QuadBlockBasis,D,S}
     nmodes = op.basis.nmodes
     p = _basisperm(B1, nmodes)
-    return GaussianChannel(B1(nmodes), op.disp[p], op.transform[p, p], op.noise[p, p]; ħ = op.ħ)
+    return GaussianChannel(B1(nmodes), _permute(op.disp, p), _permutesquare(op.transform, p), _permutesquare(op.noise, p); ħ = op.ħ)
 end
 changebasis(::Type{<:QuadBlockBasis}, op::GaussianChannel{<:QuadBlockBasis,D,S}) where {D,S} = op
 changebasis(::Type{<:QuadPairBasis}, op::GaussianChannel{<:QuadPairBasis,D,S}) where {D,S} = op

@@ -154,18 +154,19 @@ function apply!(
     quad_indices = _quadindices(state.basis, indices)
     return _applyunitary!(state, quad_indices, op)
 end
+# Gathered rows and columns are read out, transformed, and written back. The
+# column update reads the block the row update just wrote, so the order matters.
+#
+# Materializing each block costs an allocation that writing through an
+# `@view` would avoid, and is still the faster choice: a view indexed by a
+# vector is not strided, so `mul!` into one cannot reach BLAS and falls back to
+# a generic loop -- about 7x slower here at 128 modes. It is also the only form
+# that works on array backends whose GEMM requires strided memory.
 function _applyunitary!(state::GaussianState, quad_indices, op::GaussianUnitary)
     d, S = op.disp, op.symplectic
-    # Gathered rows/columns are materialized rather than written through a view:
-    # an index-vector view is not strided, so it cannot be a `mul!` destination
-    # on array backends whose GEMM requires strided memory.
-    mean_sub = state.mean[quad_indices]
-    state.mean[quad_indices] = S * mean_sub .+ d
-    covar_row = state.covar[quad_indices, :]
-    state.covar[quad_indices, :] = S * covar_row
-    # reads the just-updated V[q,q] block, so this must follow the row update
-    covar_col = state.covar[:, quad_indices]
-    state.covar[:, quad_indices] = covar_col * transpose(S)
+    state.mean[quad_indices] = S * state.mean[quad_indices] .+ d
+    state.covar[quad_indices, :] = S * state.covar[quad_indices, :]
+    state.covar[:, quad_indices] = state.covar[:, quad_indices] * transpose(S)
     return state
 end
 function apply!(
@@ -303,18 +304,13 @@ function apply!(
 end
 function _applychannel!(state::GaussianState, quad_indices, op::GaussianChannel)
     d, T, N = op.disp, op.transform, op.noise
-    # see `_applyunitary!` for why the gathered blocks are materialized
-    mean_sub = state.mean[quad_indices]
-    state.mean[quad_indices] = T * mean_sub .+ d
-    covar_row = state.covar[quad_indices, :]
-    state.covar[quad_indices, :] = T * covar_row
-    covar_col = state.covar[:, quad_indices]
-    state.covar[:, quad_indices] = covar_col * transpose(T)
+    state.mean[quad_indices] = T * state.mean[quad_indices] .+ d
+    state.covar[quad_indices, :] = T * state.covar[quad_indices, :]
+    state.covar[:, quad_indices] = state.covar[:, quad_indices] * transpose(T)
     # V[q,q] ← V[q,q] + N after both covariance transformations
     state.covar[quad_indices, quad_indices] = state.covar[quad_indices, quad_indices] .+ N
     return state
 end
-
 """
 Defines a stellar state for an N-mode bosonic system: a Gaussian unitary applied to a
 core state of finite Fock support.

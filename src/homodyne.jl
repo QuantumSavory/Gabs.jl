@@ -266,9 +266,9 @@ end
 
 # Finite squeezing along the axes given by `angles`, added to the measured
 # block's covariance. The 2x2 rotation lives on the quadratures of each measured
-# mode, whose positions `_quadindices` supplies, so one routine covers both
-# layouts. It is assembled on the host and added in one operation, which keeps
-# the caller's array backend untouched.
+# mode, whose positions within that block `_blockquadpositions` supplies, so one
+# routine covers both layouts. It is assembled on the host and added in one
+# operation, which keeps the caller's array backend untouched.
 function _squeezeaxes(basis::SymplecticBasis, indlength::Int, angles, squeeze::Real)
     T = float(eltype(angles))
     N = zeros(T, 2*indlength, 2*indlength)::Matrix{T}

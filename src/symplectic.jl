@@ -149,3 +149,37 @@ are assembled on the host from scalars; they have to be moved onto the moments'
 backend before they can be combined with them.
 """
 _like(::AbstractArray, A::AbstractMatrix) = A
+
+"""
+    _permute(x, p)
+    _permutesquare(A, p)
+
+`x[p]` and `A[p, p]`.
+
+The generic definitions are the indexing expressions themselves, so any array
+backend is covered. A host `Array` gets a version that walks the result in column order instead,
+which the relabelling in `changebasis` is dense enough to notice. The bound is
+`Array` rather than `StridedArray` on purpose: a `CuArray` is strided too, and
+indexing one element at a time is exactly what it must not do.
+"""
+_permute(x, p) = x[p]
+_permutesquare(A, p) = A[p, p]
+
+function _permute(x::Array, p)
+    out = similar(x)
+    @inbounds for (i, pi) in enumerate(p)
+        out[i] = x[pi]
+    end
+    return out
+end
+function _permutesquare(A::Array, p)
+    n = length(p)
+    out = similar(A, n, n)
+    @inbounds for jj in Base.OneTo(n)
+        col = @view A[:, p[jj]]
+        for ii in Base.OneTo(n)
+            out[ii, jj] = col[p[ii]]
+        end
+    end
+    return out
+end

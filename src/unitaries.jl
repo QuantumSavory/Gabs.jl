@@ -687,12 +687,12 @@ symplectic: 4×4 Matrix{Float64}:
 function changebasis(::Type{B1}, op::GaussianUnitary{B2,D,S}) where {B1<:QuadBlockBasis,B2<:QuadPairBasis,D,S}
     nmodes = op.basis.nmodes
     p = _basisperm(B1, nmodes)
-    return GaussianUnitary(B1(nmodes), op.disp[p], op.symplectic[p, p]; ħ = op.ħ)
+    return GaussianUnitary(B1(nmodes), _permute(op.disp, p), _permutesquare(op.symplectic, p); ħ = op.ħ)
 end
 function changebasis(::Type{B1}, op::GaussianUnitary{B2,D,S}) where {B1<:QuadPairBasis,B2<:QuadBlockBasis,D,S}
     nmodes = op.basis.nmodes
     p = _basisperm(B1, nmodes)
-    return GaussianUnitary(B1(nmodes), op.disp[p], op.symplectic[p, p]; ħ = op.ħ)
+    return GaussianUnitary(B1(nmodes), _permute(op.disp, p), _permutesquare(op.symplectic, p); ħ = op.ħ)
 end
 changebasis(::Type{<:QuadBlockBasis}, op::GaussianUnitary{<:QuadBlockBasis,D,S}) where {D,S} = op
 changebasis(::Type{<:QuadPairBasis}, op::GaussianUnitary{<:QuadPairBasis,D,S}) where {D,S} = op
