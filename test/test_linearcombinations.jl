@@ -494,6 +494,47 @@
         @test lc_h1_scaled.ħ == 1
     end
 
+    @testset "Embedding" begin
+        α = rand(ComplexF64)
+
+        for basis in [qpairbasis, qblockbasis]
+            lc = GaussianLinearCombination(basis, [0.7, 0.3], [coherentstate(basis, α), vacuumstate(basis)])
+            big_basis = basis ⊕ basis
+            indices = collect(basis.nmodes + 1:2*basis.nmodes)
+            embedded = embed(big_basis, indices, lc)
+            expected_states = [embed(big_basis, indices, state) for state in lc.states]
+
+            @test embedded.basis == big_basis
+            @test embedded.coeffs == lc.coeffs
+            @test embedded.states == expected_states
+            @test embedded.ħ == lc.ħ
+        end
+
+        small_pair = QuadPairBasis(2)
+        pair_coeffs = [0.6, 0.4]
+        r_vec = rand(Float64, small_pair.nmodes)
+        θ_vec = rand(Float64, small_pair.nmodes)
+        pair_states = [coherentstate(small_pair, rand(ComplexF64, small_pair.nmodes)), squeezedstate(small_pair, r_vec, θ_vec)]
+        lc_pair = GaussianLinearCombination(small_pair, pair_coeffs, pair_states)
+        full_pair = small_pair ⊕ QuadPairBasis(1)
+        embedded_pair = embed(full_pair, [1, 3], lc_pair)
+        expected_pair_states = [embed(full_pair, [1, 3], state) for state in pair_states]
+        @test embedded_pair.coeffs == pair_coeffs
+        @test embedded_pair.states == expected_pair_states
+
+        small_block = QuadBlockBasis(2)
+        block_coeffs = [0.5, 0.5]
+        block_states = [thermalstate(small_block, fill(2, small_block.nmodes)), coherentstate(small_block, rand(ComplexF64, small_block.nmodes))]
+        lc_block = GaussianLinearCombination(small_block, block_coeffs, block_states)
+        full_block = small_block ⊕ QuadBlockBasis(1)
+        embedded_block = embed(full_block, [1, 3], lc_block)
+        expected_block_states = [embed(full_block, [1, 3], state) for state in block_states]
+        @test embedded_block.coeffs == block_coeffs
+        @test embedded_block.states == expected_block_states
+
+        @test_throws AssertionError embed(full_pair, [1], lc_pair)
+    end
+
     @testset "Static arrays compatibility" begin
         coh_static = coherentstate(SVector{2*nmodes}, SMatrix{2*nmodes,2*nmodes}, qpairbasis, 1.0)
         vac_static = vacuumstate(SVector{2*nmodes}, SMatrix{2*nmodes,2*nmodes}, qpairbasis)

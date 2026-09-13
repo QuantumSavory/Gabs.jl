@@ -1,5 +1,5 @@
 ##
-# Predefined Gaussian states
+# Predefined Gaussian and non-Gaussian states
 ##
 
 """
@@ -416,6 +416,38 @@ function _eprstate(basis::QuadBlockBasis{N}, r::R, theta::R; ħ = 2) where {N<:I
     return mean, covar
 end
 
+"""
+    fockstate([Tc=Array{ComplexF64}], basis::SymplecticBasis, photons<:Int)
+    fockstate([Tc=Array{ComplexF64}], basis::SymplecticBasis, photons<:AbstractVector)
+
+`StellarState` whose core is a single Fock state and whose Gaussian factor is the identity.
+
+A vector gives the occupation of each mode, so the stellar rank is `sum(photons)`. A scalar
+is broadcast to every mode, as elsewhere in Gabs, so `fockstate(basis, n)` is `|n,…,n⟩` with
+rank `n * basis.nmodes`.
+"""
+function fockstate(::Type{Tc}, basis::SymplecticBasis{N}, photons::P; ħ = 2) where {Tc,N<:Int,P}
+    core, op = _fockstate(basis, photons; ħ = ħ)
+    return StellarState(Tc(core), op)
+end
+function fockstate(basis::SymplecticBasis{N}, photons::P; ħ = 2) where {N<:Int,P}
+    core, op = _fockstate(basis, photons; ħ = ħ)
+    return StellarState(core, op)
+end
+function _fockstate(basis::SymplecticBasis{N}, photons::P; ħ = 2) where {N<:Int,P<:Int}
+    return _fockstate(basis, fill(photons, basis.nmodes); ħ = ħ)
+end
+function _fockstate(basis::SymplecticBasis{N}, photons::P; ħ = 2) where {N<:Int,P<:AbstractVector}
+    length(photons) == basis.nmodes || throw(DimensionMismatch(
+        lazy"The occupation vector must carry one entry per mode."))
+    all(≥(0), photons) || throw(ArgumentError(
+        lazy"The occupation of each mode must be a nonnegative integer."))
+    dims = Tuple(photons .+ 1)
+    core = zeros(ComplexF64, dims)
+    core[CartesianIndex(dims)] = one(ComplexF64)
+    return core, displace(basis, zero(ComplexF64); ħ = ħ)
+end
+
 ##
 # Operations on Gaussian states
 ##
@@ -525,6 +557,23 @@ function _tensor(state1::GaussianState{B1,M1,V1}, state2::GaussianState{B2,M2,V2
     mean′′ = _promote_output_vector(typeof(mean1), typeof(mean2), mean′)
     covar′′ = _promote_output_matrix(typeof(covar1), typeof(covar2), covar′)
     return mean′′, covar′′
+end
+
+"""
+    tensor(state1::StellarState, state2::StellarState)
+
+Tensor product of stellar states, which can also be called with `⊗`.
+"""
+function tensor(state1::StellarState, state2::StellarState)
+    gaussian = state1.gaussian ⊗ state2.gaussian
+    core1, core2 = state1.core, state2.core
+    core = reshape(vec(core1) * transpose(vec(core2)), (size(core1)..., size(core2)...))
+    return StellarState(core, gaussian)
+end
+function tensor(::Type{Tc}, ::Type{Td}, ::Type{Ts}, x::StellarState, y::StellarState) where {Tc,Td,Ts}
+    core1, core2 = x.core, y.core
+    core = reshape(vec(core1) * transpose(vec(core2)), (size(core1)..., size(core2)...))
+    return StellarState(Tc(core), tensor(Td, Ts, x.gaussian, y.gaussian))
 end
 
 """
@@ -642,6 +691,11 @@ function _ptrace(state::GaussianState{B,M,V}, indices::T) where {B<:QuadBlockBas
     return mean′′, covar′′
 end
 
+ptrace(::StellarState, ::Int) = throw(ArgumentError(STELLAR_PTRACE_ERROR))
+ptrace(::StellarState, ::AbstractVector{<:Int}) = throw(ArgumentError(STELLAR_PTRACE_ERROR))
+ptrace(::Type{Tm}, ::Type{Tc}, ::StellarState, ::Any) where {Tm,Tc} =
+    throw(ArgumentError(STELLAR_PTRACE_ERROR))
+
 """
     embed(basis::SymplecticBasis, idx::Int, state::GaussianState)
     embed(basis::SymplecticBasis, indices::AbstractVector{<:Int}, state::GaussianState)
@@ -751,6 +805,35 @@ function embed(
 end
 
 """
+    embed(basis::SymplecticBasis, idx::Int, state::StellarState)
+    embed(basis::SymplecticBasis, indices::AbstractVector{<:Int}, state::StellarState)
+
+Embed a smaller stellar state into a larger Hilbert space specified by a target
+symplectic basis, inserting it at the mode index (or indices) specified by `idx` or `indices`.
+"""
+function embed(basis::SymplecticBasis, index::Int, x::StellarState)
+    return embed(basis, [index], x)
+end
+function embed(basis::SymplecticBasis, indices::Vector{<:Int}, x::StellarState)
+    @assert length(indices) == nmodes(x) "Number of indices must match number of modes in the state"
+    @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
+    total = basis.nmodes
+    dims = ones(Int, total)
+    @inbounds for (i, idx) in enumerate(indices)
+        dims[idx] = size(x.core, i)
+    end
+    core = zeros(eltype(x.core), dims...)
+    target = ones(Int, total)
+    @inbounds for I in CartesianIndices(x.core)
+        for (i, idx) in enumerate(indices)
+            target[idx] = I[i]
+        end
+        core[CartesianIndex(target...)] = x.core[I]
+    end
+    return StellarState(core, embed(basis, indices, x.gaussian))
+end
+
+"""
     changebasis(::SymplecticBasis, state::GaussianState)
 
 Change the symplectic basis of a Gaussian state.
@@ -804,7 +887,7 @@ function changebasis(::Type{B1}, state::GaussianState{B2,M,V}) where {B1<:QuadBl
             covar[nmodes + j, nmodes + i] = state.covar[2*j, 2*i]
         end
     end
-    return GaussianState(B1(nmodes), mean, covar)
+    return GaussianState(B1(nmodes), mean, covar; ħ = state.ħ)
 end
 function changebasis(::Type{B1}, state::GaussianState{B2,M,V}) where {B1<:QuadPairBasis,B2<:QuadBlockBasis,M,V}
     nmodes = state.basis.nmodes
@@ -823,11 +906,19 @@ function changebasis(::Type{B1}, state::GaussianState{B2,M,V}) where {B1<:QuadPa
             covar[2*j, 2*i] = state.covar[nmodes + j, nmodes + i]
         end
     end
-    return GaussianState(B1(nmodes), mean, covar)
+    return GaussianState(B1(nmodes), mean, covar; ħ = state.ħ)
 end
 changebasis(::Type{<:QuadBlockBasis}, state::GaussianState{<:QuadBlockBasis,M,V}) where {M,V} = state
 changebasis(::Type{<:QuadPairBasis}, state::GaussianState{<:QuadPairBasis,M,V}) where {M,V} = state
 
+"""
+    changebasis(::SymplecticBasis, state::StellarState)
+
+Change the symplectic basis of a stellar state.
+"""
+changebasis(::Type{B1}, x::StellarState) where {B1<:SymplecticBasis} = StellarState(x.core, changebasis(B1, x.gaussian))
+changebasis(::Type{<:QuadPairBasis}, x::StellarState{C,<:GaussianUnitary{<:QuadPairBasis}}) where {C} = x
+changebasis(::Type{<:QuadBlockBasis}, x::StellarState{C,<:GaussianUnitary{<:QuadBlockBasis}}) where {C} = x
 
 """
     sympspectrum(state::GaussianState)

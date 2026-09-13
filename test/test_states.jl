@@ -108,6 +108,9 @@
             @test ptrace(state, [2, 3]) == s1
             @test_throws ArgumentError ptrace(state, [1, 2, 3, 4])
 
+            single_mode = coherentstate(basis, alpha)
+            @test_throws ArgumentError ptrace(single_mode, 1)
+
             sstatic = coherentstate(SVector{2}, SMatrix{2,2}, basis, alpha)
             tpstatic = sstatic ⊗ sstatic ⊗ sstatic
             @test ptrace(tpstatic, 1) == sstatic ⊗ sstatic
