@@ -27,9 +27,7 @@ wherein it is understood that ``0 \\log(0) \\equiv 0``.
 * `tol`: Tolerance (exclusive) above the cut-off at ``1/2`` for computing ``f(x)``.
 """
 function entropy_vn(state::GaussianState{B, M, V}; tol::Real = real(eltype(V)) <: AbstractFloat ? 128 * eps(real(eltype(V))(1) / real(eltype(V))(2)) : 128 * eps(1/2)) where {B, M, V}
-    # `T` and `tol` are bound once, to a concrete type and value: the predicate
-    # below is compiled for the spectrum's backend, and a reassigned or
-    # abstractly-typed capture makes it uninferable there
+    # bound once and concretely: the predicate is compiled for the spectrum's backend
     Tv = real(eltype(V))
     T = Tv <: AbstractFloat ? Tv : Float64
     tol′, half = T(tol), T(1) / T(2)
@@ -38,10 +36,7 @@ function entropy_vn(state::GaussianState{B, M, V}; tol::Real = real(eltype(V)) <
 end
 
 # this is the same as f(x)
-# The constants are built at `typeof(x)` so the result stays in the input's
-# precision; with `Float64` literals a `Float32` argument returns
-# `Union{Float32,Float64}`, which is both a type instability and not something a
-# GPU broadcast can allocate an output for.
+# constants at typeof(x), so a Float32 argument does not widen to Float64
 function _entropy_vn(x::T) where {T<:Number}
     half = T(1) / T(2)
     return x < T(19) ?
@@ -134,9 +129,7 @@ function _tilde(state::GaussianState{B,M,V}, indices::Union{Integer, AbstractVec
     return _partialtranspose(state.covar, [nmodes + i for i in idx])
 end
 
-# Partial transposition flips the sign of the momentum row and column of each
-# selected mode; `prows` carries their positions in the layout at hand. Whole
-# slices rather than per-element writes keep this valid on any array backend.
+# flip the sign of the momentum row and column of each selected mode
 function _partialtranspose(covar, prows)
     T = copy(covar)
     T[:, prows] .*= -1

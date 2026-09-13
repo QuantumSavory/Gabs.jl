@@ -17,10 +17,7 @@ function _part_state(state::GaussianState{<:QuadBlockBasis,M,V}, indices::I) whe
 	return _partition(state, indices)
 end
 
-# The partition is a pair of gathers on the quadratures of the measured and
-# unmeasured modes, so the two layouts differ only in `_quadindices`. Allocating
-# by indexing the moments keeps the blocks in the state's own element type and
-# on its own device, instead of forcing host `Float64`.
+# gather the quadratures of the measured and unmeasured modes
 function _partition(state::GaussianState, indices)
 	basis = state.basis
 	notindices = setdiff(1:basis.nmodes, indices)

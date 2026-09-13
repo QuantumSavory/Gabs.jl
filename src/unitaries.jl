@@ -611,8 +611,7 @@ function embed(
     return _embedunitary(basis, indices, op)
 end
 
-# Scatter the operator onto the identity at the quadratures owned by `indices`,
-# so the untouched modes are left alone.
+# scatter the operator onto the identity, leaving other modes alone
 function _embedunitary(basis::SymplecticBasis, indices::Vector{<:Int}, op::GaussianUnitary)
     @assert length(indices) == op.basis.nmodes "Number of indices must match number of modes in the unitary"
     @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"

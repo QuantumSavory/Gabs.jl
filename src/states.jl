@@ -498,9 +498,7 @@ function _tensor(state1::GaussianState{B1,M1,V1}, state2::GaussianState{B2,M2,V2
                              _tensorperm(state1.basis, state2.basis))
 end
 
-# Stack the two operands, then relabel. Concatenation already gives the direct
-# sum in the pairwise layout; the blockwise layout needs the quadratures of the
-# joint system regrouped, which `_tensorperm` expresses as a single gather.
+# stack the operands, then relabel into the joint layout
 function _directsummoments(mean1, covar1, mean2, covar2, perm)
     m1, m2 = _codevice(mean1, mean2)
     mean′ = vcat(m1, m2)
@@ -515,7 +513,6 @@ function _directsummoments(mean1, covar1, mean2, covar2, perm)
     return mean′′, covar′′
 end
 
-# `[A 0; 0 B]`, allocated from `A` so the result keeps its array type.
 function _blockdiag(A, B, n1::Int, n2::Int)
     A′, B′ = _codevice(A, B)
     T = promote_type(eltype(A′), eltype(B′))
@@ -536,10 +533,9 @@ that cannot read the other's memory defines this to bring both onto its own.
 """
 _codevice(A, B) = (A, B)
 
-# Pairwise concatenation is already the direct sum, so no relabelling is needed.
+# pairwise concatenation is already the direct sum
 _tensorperm(::QuadPairBasis, ::QuadPairBasis) = nothing
-# Blockwise stacking gives [q⁽¹⁾,p⁽¹⁾,q⁽²⁾,p⁽²⁾]; the joint state wants
-# [q⁽¹⁾,q⁽²⁾,p⁽¹⁾,p⁽²⁾].
+# blockwise stacking gives [q¹,p¹,q²,p²]; regroup to [q¹,q²,p¹,p²]
 function _tensorperm(basis1::QuadBlockBasis, basis2::QuadBlockBasis)
     n1, n2 = basis1.nmodes, basis2.nmodes
     return vcat(1:n1, 2*n1+1:2*n1+n2, n1+1:2*n1, 2*n1+n2+1:2*n1+2*n2)
@@ -626,8 +622,7 @@ function _ptrace(state::GaussianState{B,M,V}, indices::T) where {B<:QuadBlockBas
     return _gathermoments(mean, covar, quad)
 end
 
-# Keeping a set of modes is a symmetric gather on the quadratures they own, so
-# one indexing expression serves both bases and every array backend.
+# keep the quadratures of the retained modes
 function _gathermoments(mean, covar, quad)
     mean′ = mean[quad]
     covar′ = _gathersquare(covar, quad)
@@ -636,13 +631,8 @@ function _gathermoments(mean, covar, quad)
     return mean′′, covar′′
 end
 
-# `A[q, q]` for a symmetric `A`. The generic form is one indexing expression,
-# which every array backend understands.
 _gathersquare(A, quad) = A[quad, quad]
-# On a host `Array`, walking the result in column order and reading
-# through a column view beats the generic two-dimensional index. Filling only one
-# triangle and mirroring it is slower despite halving the reads: the mirrored
-# write lands in a different column each time.
+# column-major gather; faster than A[quad, quad] on a host Array
 function _gathersquare(A::Array, quad)
     m = length(quad)
     out = similar(A, m, m)
@@ -715,8 +705,7 @@ function embed(
     return _embedstate(basis, indices, state)
 end
 
-# Scatter the substate onto a vacuum background at the quadratures owned by
-# `indices`; the layout only enters through `_quadindices`.
+# scatter the substate onto a vacuum background
 function _embedstate(basis::SymplecticBasis, indices::Vector{<:Int}, state::GaussianState)
     @assert length(indices) == state.basis.nmodes "Number of indices must match number of modes in the state"
     @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"

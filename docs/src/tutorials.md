@@ -176,9 +176,8 @@ Use [Latexify](https://github.com/korsbo/Latexify.jl) to render the covariance m
 ## GPU Acceleration
 
 A GPU array is a custom array like any other, so the section above already
-describes how to use one: load [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl)
-and name `CuVector`/`CuMatrix` where the previous examples named `SVector` and
-`SMatrix`.
+covers it: load [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl) and name
+`CuVector`/`CuMatrix` where the previous examples named `SVector` and `SMatrix`.
 
 ```julia
 julia> using CUDA
@@ -194,12 +193,11 @@ covariance: 2×2 CuArray{Float32, 2, CUDA.DeviceMemory}:
  -0.830993   2.37407
 ```
 
-Loading CUDA.jl brings in a small extension that teaches Gabs.jl how to keep
-results on the device. Every predefined state, unitary and channel accepts the
-array type the same way, and the operations between them — `*`, [`apply!`](@ref),
-[`tensor`](@ref), [`ptrace`](@ref), [`embed`](@ref), [`changebasis`](@ref),
-[`wigner`](@ref), the metrics, the random constructors and the measurements —
-give back objects whose moments are still `CuArray`s:
+Every predefined state, unitary and channel takes the array type this way.
+Operations on them return objects whose moments are still `CuArray`s, including
+`*`, [`apply!`](@ref), [`tensor`](@ref), [`ptrace`](@ref), [`embed`](@ref),
+[`changebasis`](@ref), [`wigner`](@ref), the metrics, the random constructors
+and the measurements:
 
 ```julia
 julia> op = beamsplitter(CuVector{Float32}, CuMatrix{Float32}, QuadPairBasis(2), 0.4);
@@ -211,42 +209,26 @@ CuArray{Float32, 2, CUDA.DeviceMemory}
 ```
 
 A host operand mixed with a device one is moved to the device, so
-`state ⊗ cpu_state` also returns a GPU-backed state. To bring a result back,
-convert its fields with `Array`.
+`state ⊗ cpu_state` also returns a GPU-backed state. Convert the fields with
+`Array` to bring a result back.
 
-### Evaluating many phase-space points
-
-[`wigner`](@ref) and [`wignerchar`](@ref) also take a `2N × M` matrix whose
-columns are points, and return one value per column. This is the form to use for
-a phase-space grid: the covariance is factorized once for the whole set instead
-of once per point, which is worth doing on the CPU and is what gives a GPU
-enough work to be worth the trip.
+[`wigner`](@ref), [`wignerchar`](@ref), [`cross_wigner`](@ref) and
+[`cross_wignerchar`](@ref) also take a `2N x M` matrix whose columns are points
+and return one value per column, factorizing the covariance once for the set:
 
 ```julia
 julia> grid = reduce(hcat, [[x, p] for x in -3:0.05:3, p in -3:0.05:3]);
 
-julia> w = wigner(state, CuMatrix{Float32}(grid));   # one value per column
+julia> w = wigner(state, CuMatrix{Float32}(grid));
 ```
 
-The same applies to [`cross_wigner`](@ref) and to a
-[`GaussianLinearCombination`](@ref), where the interference sum runs over
-`length(lc)^2` pairs at every point.
-
 !!! note
-    Moving to the GPU pays off once there is enough work to hide the cost of
-    launching a kernel. Measured on an RTX 2080 Ti:
-
-    - Applying a Gaussian unitary breaks even near 64 modes and is about 85×
-      faster at 1024; below about 32 modes the CPU is quicker.
-    - Batched `wigner` over 25,000 points is about 2.6× the batched CPU call
-      (36× a per-point loop). For a 2-state interference Wigner over 50,000
-      points it is about 5× the batched CPU call, 73× the loop.
-    - Drawing measurement samples gains from asking for many shots at once,
-      about 7× at 10⁴ shots.
-
-    Note the two baselines. Most of the distance from a per-point loop is won by
-    batching itself, which helps the CPU just as much; the device then adds
-    roughly another 3–6× on top at these sizes.
+    The GPU pays off once there is enough work to cover a kernel launch. On an
+    RTX 2080 Ti, applying a Gaussian unitary breaks even near 64 modes and is
+    about 85x faster at 1024, while below 32 modes the CPU is quicker. Batched
+    `wigner` over 25,000 points is about 2.6x the same batched call on the CPU,
+    and 36x a loop over single points; most of that second figure is the
+    batching, which helps the CPU equally.
 
 ## Multithreading
 

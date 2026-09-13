@@ -244,8 +244,7 @@ function _tensor(op1::GaussianChannel{B1,D1,T1}, op2::GaussianChannel{B2,D2,T2})
     return _directsumchannel(op1, op2, _tensorperm(op1.basis, op2.basis))
 end
 
-# As `_directsummoments`, but a channel carries a noise matrix alongside its
-# transform and both are relabelled the same way.
+# as _directsummoments, with the noise matrix relabelled alongside the transform
 function _directsumchannel(op1::GaussianChannel, op2::GaussianChannel, perm)
     disp1, trans1, noise1 = op1.disp, op1.transform, op1.noise
     disp2, trans2, noise2 = op2.disp, op2.transform, op2.noise
@@ -297,8 +296,7 @@ function embed(
     return _embedchannel(basis, indices, op)
 end
 
-# As `_embedunitary`, with the noise matrix scattered onto a zero background:
-# the untouched modes pick up no noise.
+# as _embedunitary; untouched modes pick up no noise
 function _embedchannel(basis::SymplecticBasis, indices::Vector{<:Int}, op::GaussianChannel)
     @assert length(indices) == op.basis.nmodes "Number of indices must match number of modes in the channel"
     @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"

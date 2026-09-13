@@ -608,12 +608,8 @@ end
 """
     cross_wigner(state1::GaussianState, state2::GaussianState, xs::AbstractMatrix)
 
-Cross-Wigner function at each column of `xs`, a `2N × M` matrix of phase-space
-points. Returns a vector of length `M`.
-
-As for [`wigner`](@ref), evaluating the points together reuses the one
-factorization of the averaged covariance and leaves a single matrix product per
-term.
+Compute the cross-Wigner function at each column of `xs`, a matrix of size
+2N x M.
 """
 function cross_wigner(state1::GaussianState, state2::GaussianState, xs::AbstractMatrix)
     state1.basis == state2.basis || throw(ArgumentError(SYMPLECTIC_ERROR))
@@ -628,9 +624,7 @@ function cross_wigner(state1::GaussianState, state2::GaussianState, xs::Abstract
     quad = vec(sum(dx .* (Vavg \ dx); dims = 1))
     phase_arg = vec(transpose(Ω * (μ1 .- μ2)) * dx)
     lognorm = -n*log(2π) - 0.5*_logdet(Vavg)
-    # `Ω` is antisymmetric, so contracting `Δμ` through it on the left as
-    # `(ΩΔμ)ᵀdx` is the negation of the single-point form's `Δμᵀ Ω dx`; the sign
-    # on the phase compensates
+    # Ω is antisymmetric, hence the sign on the phase
     return exp(lognorm) .* exp.(-0.5 .* quad) .* cis.(.-phase_arg ./ ħ)
 end
 
@@ -642,8 +636,7 @@ Compute Wigner function of a linear combination including quantum interference.
 """
 function wigner(lc::GaussianLinearCombination, x::AbstractVector)
     length(x) == length(lc.states[1].mean) || throw(ArgumentError(WIGNER_ERROR))
-    # seeded from the first term rather than a `0.0` literal, so the running sum
-    # takes the element type the states actually carry
+    # seeded from the first term, so the sum takes the states' element type
     c1, s1 = lc[1]
     result = abs2(c1) * wigner(s1, x)
     @inbounds for i in 1:length(lc)
@@ -660,15 +653,11 @@ end
 """
     wigner(lc::GaussianLinearCombination, xs::AbstractMatrix)
 
-Wigner function of a linear combination, including interference, at each column
-of `xs`. Returns a vector of length `size(xs, 2)`.
-
-The pairwise sum costs `length(lc)^2` terms whatever the number of points, so
-batching amortizes it over the whole grid at once.
+Compute the Wigner function of a linear combination, including interference, at
+each column of `xs`.
 """
 function wigner(lc::GaussianLinearCombination, xs::AbstractMatrix)
     size(xs, 1) == length(lc.states[1].mean) || throw(ArgumentError(WIGNER_ERROR))
-    # seeded from the first term so the accumulator lives wherever the states do
     c1, s1 = lc[1]
     result = abs2(c1) .* wigner(s1, xs)
     @inbounds for i in 1:length(lc)
@@ -706,8 +695,8 @@ end
 """
     cross_wignerchar(state1::GaussianState, state2::GaussianState, xis::AbstractMatrix)
 
-Cross-Wigner characteristic function at each column of `xis`. Returns a vector
-of length `size(xis, 2)`.
+Compute the cross-Wigner characteristic function at each column of `xis`, a
+matrix of size 2N x M.
 """
 function cross_wignerchar(state1::GaussianState, state2::GaussianState, xis::AbstractMatrix)
     state1.basis == state2.basis || throw(ArgumentError(SYMPLECTIC_ERROR))
@@ -725,12 +714,11 @@ end
 """
     wignerchar(lc::GaussianLinearCombination, xis::AbstractMatrix)
 
-Wigner characteristic function of a linear combination, including interference,
-at each column of `xis`.
+Compute the Wigner characteristic function of a linear combination, including
+interference, at each column of `xis`.
 """
 function wignerchar(lc::GaussianLinearCombination, xis::AbstractMatrix)
     size(xis, 1) == length(lc.states[1].mean) || throw(ArgumentError(WIGNER_ERROR))
-    # seeded from the first term so the accumulator lives wherever the states do
     c1, s1 = lc[1]
     result = complex.(abs2(c1) .* wignerchar(s1, xis))
     @inbounds for i in 1:length(lc)
@@ -751,7 +739,6 @@ Compute Wigner characteristic function of a linear combination including interfe
 """
 function wignerchar(lc::GaussianLinearCombination, xi::AbstractVector)
     length(xi) == length(lc.states[1].mean) || throw(ArgumentError(WIGNER_ERROR))
-    # see `wigner` above on why the sum is seeded from the first term
     c1, s1 = lc[1]
     result = complex(abs2(c1) * wignerchar(s1, xi))
     @inbounds for i in 1:length(lc)

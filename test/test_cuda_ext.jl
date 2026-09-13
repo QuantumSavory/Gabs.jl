@@ -4,12 +4,8 @@
     using LinearAlgebra
     using Random
 
-    # Every value below is compared against the same computation on `Array`s, so
-    # a disagreement is a real difference and not a tolerance being met by luck.
-    # `Float64` on both sides keeps the comparison about the code rather than
-    # about precision. Scalar indexing is switched off for the whole item: a
-    # method that falls back to indexing a `CuArray` element by element is a bug
-    # even when it returns the right answer, and this turns that into a failure.
+    # scalar indexing is an error here: a method that falls back to it is a bug
+    # even when the answer is right
     CUDA.allowscalar(false)
 
     const CV = CuVector{Float64}
@@ -22,7 +18,6 @@
     ongpu(x::GaussianChannel) =
         x.disp isa CuArray && x.transform isa CuArray && x.noise isa CuArray
 
-    # Compare a GPU object against its CPU counterpart field by field.
     function samemoments(cpu, gpu; atol = 1e-12)
         ongpu(gpu) || return false
         if cpu isa GaussianState
@@ -47,9 +42,7 @@
             @test samemoments(coherentstate(b1, 1.0 + 0.5im), coherentstate(CV, CM, b1, 1.0 + 0.5im))
             @test samemoments(squeezedstate(b1, 0.3, 0.7), squeezedstate(CV, CM, b1, 0.3, 0.7))
             @test samemoments(eprstate(b2, 0.3, 0.7), eprstate(CV, CM, b2, 0.3, 0.7))
-            # the single-type form has to reach both the vector and the matrix
             @test ongpu(vacuumstate(CuArray{Float64}, b2))
-            # and the element type asked for is the one that comes back
             @test eltype(vacuumstate(CuVector{Float32}, CuMatrix{Float32}, b1).covar) === Float32
         end
 
@@ -111,8 +104,6 @@
         end
 
         @testset "$(nameof(B)): operands on different devices" begin
-            # An operator and a state need not start on the same device. The
-            # result belongs on the device, and has to equal the CPU answer.
             ref = uc * sc
             @test samemoments(ref, uc * sg)
             @test samemoments(ref, ug * sc)
@@ -122,7 +113,6 @@
             @test samemoments(ref, apply!(copy(sg), uc))
             @test samemoments(refc, apply!(copy(sg), cc))
 
-            # and through a linear combination, which delegates per state
             lcc = GaussianLinearCombination(b1, [0.6, -0.8], [sc, sc2])
             lcg = GaussianLinearCombination(b1, [0.6, -0.8], [sg, sg2])
             @test samemoments((uc * lcc).states[1], (uc * lcg).states[1])
@@ -137,10 +127,8 @@
             @test logarithmic_negativity(eprstate(CV, CM, b2, 0.5, 0.3), 1) ≈
                   logarithmic_negativity(eprstate(b2, 0.5, 0.3), 1)
             @test issymplectic(b1, Array(ug.symplectic))
-            # `isgaussian` compares eigenvalues against zero, and a pure state
-            # sits exactly on that boundary; CUSOLVER and LAPACK land on
-            # opposite sides of it by ~2e-16, so this needs a tolerance to be a
-            # statement about the state rather than about the eigensolver.
+            # a pure state sits on the semidefiniteness boundary; CUSOLVER and
+            # LAPACK round it either way, hence the tolerance
             @test isgaussian(tg; atol = 1e-10) == isgaussian(tc; atol = 1e-10)
 
             x = [0.11, -0.23, 0.31, 0.07, -0.5, 0.19]
@@ -149,8 +137,6 @@
         end
 
         @testset "$(nameof(B)): batched phase-space evaluation" begin
-            # A grid of points is the case worth sending to a device, and the
-            # answer has to be the CPU's.
             xs = randn(6, 32)
             xg = CuMatrix{Float64}(xs)
             @test Array(wigner(tg, xg)) ≈ wigner(tc, xs)
@@ -169,17 +155,14 @@
             @test Array(wignerchar(lcg, xg)) ≈ wignerchar(lcc, xs)
             @test wigner(lcg, xg) isa CuVector
 
-            # the single-point forms of the same functions, which reach the
-            # interference sum and the cross terms through a different path
+            # the single-point forms take a different path
             x1 = xs[:, 1]
             xd = CuVector{Float64}(x1)
             @test cross_wigner(tg, v1, xd) ≈ cross_wigner(tc, u1, x1)
             @test cross_wignerchar(tg, v1, xd) ≈ cross_wignerchar(tc, u1, x1)
             @test wigner(lcg, xd) ≈ wigner(lcc, x1)
             @test wignerchar(lcg, xd) ≈ wignerchar(lcc, x1)
-            # cross_wigner of a state with itself is its own Wigner function
             @test cross_wigner(tg, tg, xd) ≈ wigner(tg, xd)
-            # and the pair is Hermitian
             @test cross_wigner(tg, v1, xd) ≈ conj(cross_wigner(v1, tg, xd))
         end
 
@@ -189,7 +172,6 @@
             @test ongpu(randunitary(CV, CM, b2))
             @test ongpu(randchannel(CV, CM, b2))
             @test randsymplectic(CM, b2) isa CuMatrix
-            # drawn on the device, still a legitimate Gaussian object
             @test isgaussian(randstate(CV, CM, b2); atol = 1e-10)
             @test issymplectic(b2, Array(randunitary(CV, CM, b2).symplectic); atol = 1e-10)
         end
@@ -201,7 +183,7 @@
             @test ongpu(Mg.state)
             # the conditional covariance does not depend on the sampled outcome
             @test isapprox(Array(Mg.state.covar), Mc.state.covar; atol = 1e-10)
-            # projecting onto a fixed state makes the whole result deterministic
+            # projecting onto a fixed state is deterministic
             @test samemoments(generaldyne(tc, [2]; proj = vacuumstate(b1)).state,
                               generaldyne(tg, [2]; proj = vacuumstate(CV, CM, b1)).state;
                               atol = 1e-10)
@@ -229,8 +211,6 @@
         out = u32 * s32
         @test eltype(out.covar) === Float32
         @test ongpu(out)
-        # the same computation in double precision on the host, to the accuracy
-        # single precision can carry
         s64 = GaussianState(b, Array(Float64.(s32.mean)), Array(Float64.(s32.covar)); ħ = s32.ħ)
         u64 = displace(b, 0.3 + 0.2im)
         @test isapprox(Array(out.covar), (u64 * s64).covar; rtol = 1e-5)

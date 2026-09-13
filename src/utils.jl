@@ -16,16 +16,7 @@ Base.@propagate_inbounds function _promote_output_matrix(::Type{T}, mat_out, out
     T <: Matrix{Float64} ? mat_out : T(mat_out)
 end
 
-"""
-    _det(A)
-    _logdet(A)
-
-Determinant and log-determinant of a covariance-like matrix.
-
-These wrap `det`/`logdet` so that array backends without an LU-based
-implementation can supply their own. `LinearAlgebra.det` reads the diagonal of
-the LU factorization element by element, which some GPU array types disallow;
-such a backend defines these methods over a factorization it does support.
-"""
+# hooks: det/logdet read the LU diagonal elementwise, which some array backends
+# disallow; those define these over a factorization they support
 _det(A) = det(A)
 _logdet(A) = logdet(A)

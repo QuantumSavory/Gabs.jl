@@ -115,7 +115,6 @@ end
 function Base.:(*)(op::GaussianUnitary, state::GaussianState)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
-    # the operator and the state need not start on the same device
     S, covar = _codevice(op.symplectic, state.covar)
     d, mean = _codevice(op.disp, state.mean)
     mean′ = S * mean .+ d
@@ -130,7 +129,7 @@ In-place application of a Gaussian unitary `op` on a Gaussian state `state`.
 function apply!(state::GaussianState, op::GaussianUnitary)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
-    # the state is written in place, so the operator is the one that moves
+    # the state is written in place, so the operator is what moves
     _, S = _codevice(state.covar, op.symplectic)
     _, d = _codevice(state.mean, op.disp)
     state.mean .= S * state.mean .+ d
@@ -158,14 +157,8 @@ function apply!(
     quad_indices = _quadindices(state.basis, indices)
     return _applyunitary!(state, quad_indices, op)
 end
-# Gathered rows and columns are read out, transformed, and written back. The
-# column update reads the block the row update just wrote, so the order matters.
-#
-# Materializing each block costs an allocation that writing through an
-# `@view` would avoid, and is still the faster choice: a view indexed by a
-# vector is not strided, so `mul!` into one cannot reach BLAS and falls back to
-# a generic loop -- about 7x slower here at 128 modes. It is also the only form
-# that works on array backends whose GEMM requires strided memory.
+# the column update reads the block the row update just wrote, so order matters.
+# blocks are materialized rather than viewed: mul! into a gather view misses BLAS
 function _applyunitary!(state::GaussianState, quad_indices, op::GaussianUnitary)
     d, S = op.disp, op.symplectic
     state.mean[quad_indices] = S * state.mean[quad_indices] .+ d
@@ -532,12 +525,10 @@ true
 ```
 
 !!! note
-    The default `atol = 0` asks for the semidefiniteness test to hold exactly.
-    A pure state sits on the boundary, where its smallest eigenvalues are zero,
-    so whether they come back as `0.0` or as `-2e-16` is up to the eigensolver;
-    LAPACK and CUSOLVER round these differently, and so may two CPU builds. Pass
-    an `atol` on the order of the state's conditioning, say `atol = 1e-12`, when
-    the answer should not depend on that.
+    The default `atol = 0` tests semidefiniteness exactly. A pure state sits on
+    that boundary, where the smallest eigenvalues are zero and different
+    eigensolvers round them either way, so pass an `atol` when the answer should
+    not depend on that.
 """
 function isgaussian(x::GaussianState; atol::R1 = 0, rtol::R2 = atol) where {R1<:Real, R2<:Real}
     covar = x.covar

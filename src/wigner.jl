@@ -19,14 +19,8 @@ end
 """
     wigner(state::GaussianState, xs::AbstractMatrix)
 
-Wigner function of an N-mode Gaussian state at each column of `xs`, a `2N × M`
-matrix of phase-space points. Returns a vector of length `M`.
-
-Evaluating a set of points together shares the one factorization of the
-covariance between them and leaves the per-point work as a single matrix
-product, rather than repeating a `2N × 2N` solve for every point. This is the
-form to use for a phase-space grid, and the form that has something for a GPU
-to do.
+Compute the Wigner function of an N-mode Gaussian state at each column of `xs`,
+a matrix of size 2N x M. The covariance is factorized once for the whole set.
 
 ## Example
 
@@ -56,10 +50,8 @@ end
 """
     wignerchar(state::GaussianState, xis::AbstractMatrix)
 
-Wigner characteristic function of an N-mode Gaussian state at each column of
-`xis`, a `2N × M` matrix. Returns a vector of length `M`. See
-[`wigner(::GaussianState, ::AbstractMatrix)`](@ref) on why the batched form
-exists.
+Compute the Wigner characteristic function of an N-mode Gaussian state at each
+column of `xis`, a matrix of size 2N x M.
 """
 function wignerchar(state::GaussianState, xis::AbstractMatrix)
     basis = state.basis

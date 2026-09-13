@@ -23,8 +23,6 @@
     end
 
     @testset "batched evaluation" begin
-        # A matrix of points has to give exactly what evaluating the columns one
-        # at a time gives; the batched form only rearranges the arithmetic.
         for basis in (QuadPairBasis, QuadBlockBasis), nmodes in (1, 2, 3)
             b = basis(nmodes)
             state = randstate(b)

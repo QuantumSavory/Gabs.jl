@@ -86,10 +86,7 @@ function generaldyne(state::GaussianState{<:QuadBlockBasis,Tm,Tc}, indices::R;
 	return _generaldyne(state, indices, proj, Tm, Tc)
 end
 
-# The conditional state of the unmeasured modes, written back into a vacuum
-# background at the quadratures those modes own. This is the inverse of the
-# gather in `_part_state`, so the two layouts again differ only in
-# `_quadindices`.
+# conditional state of the unmeasured modes, on a vacuum background
 function _generaldyne(state::GaussianState, indices, proj, ::Type{Tm}, ::Type{Tc}) where {Tm,Tc}
 	basis = state.basis
 	nmodes = basis.nmodes
@@ -140,11 +137,7 @@ function Base.rand(::Type{Generaldyne}, state::GaussianState{<:QuadBlockBasis,Tm
 	return _generaldyne_samples(state, indices, proj, shots)
 end
 
-# Outcomes of the measured block are Gaussian with mean `b` and covariance
-# `B + proj`; drawing them is one Cholesky factor applied to a matrix of normal
-# deviates. Sampling every shot in a single product keeps the work in one
-# `mul!`, and allocating the deviates with `similar` keeps them in the state's
-# element type and on its device.
+# outcomes are Gaussian with mean b and covariance B + proj; all shots at once
 function _generaldyne_samples(state::GaussianState, indices, proj, shots::Int)
 	basis = state.basis
 	indlength = length(indices)
@@ -152,9 +145,7 @@ function _generaldyne_samples(state::GaussianState, indices, proj, shots::Int)
 	2*indlength == size(proj, 1) == size(proj, 2) || throw(ArgumentError(GENERALDYNE_ERROR))
 	_, b, _, B, _ = _part_state(state, indices)
 	B = B .+ _like(B, proj)
-	# `F.U'` names the same factor as `F.L`, but a backend whose Cholesky stores
-	# the upper factor builds `.L` by transposing element by element, which is not
-	# available on every array type.
+	# U' rather than L: some backends build L by transposing element by element
 	L = cholesky(Symmetric(B)).U'
 	z = similar(b, 2*indlength, shots)
 	randn!(z)

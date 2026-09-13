@@ -94,8 +94,7 @@ function homodyne(
     return _homodyne(rng, state, indices, angles, squeeze, Tm, Tc)
 end
 
-# As `_generaldyne`: the conditional moments of the unmeasured modes scattered
-# back onto a vacuum background.
+# as _generaldyne: conditional moments on a vacuum background
 function _homodyne(rng::AbstractRNG, state::GaussianState, indices, angles, squeeze::Real, ::Type{Tm}, ::Type{Tc}) where {Tm,Tc}
     basis = state.basis
     nmodes = basis.nmodes
@@ -188,9 +187,7 @@ function Base.rand(
     return _homodyne_samples(rng, state, indices, angles, shots, squeeze)
 end
 
-# Homodyne outcomes are Gaussian with mean `b` and covariance `B` broadened by
-# the finite-squeezing term; as in `_generaldyne_samples`, all shots come from
-# one triangular product.
+# as _generaldyne_samples, with B broadened by the finite-squeezing term
 function _homodyne_samples(rng::AbstractRNG, state::GaussianState, indices, angles, shots::Int, squeeze::Real)
     basis = state.basis
     indlength = length(indices)
@@ -198,9 +195,7 @@ function _homodyne_samples(rng::AbstractRNG, state::GaussianState, indices, angl
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
     _, b, _, B, _ = _part_state(state, indices)
     B = B .+ _like(B, _squeezeaxes(basis, indlength, angles, squeeze))
-    # `F.U'` names the same factor as `F.L`, but a backend whose Cholesky stores
-    # the upper factor builds `.L` by transposing element by element, which is not
-    # available on every array type.
+    # U' rather than L: some backends build L by transposing element by element
     L = cholesky(Symmetric(B)).U'
     z = similar(b, 2*indlength, shots)
     randn!(rng, z)
@@ -264,15 +259,10 @@ function _homodyne_filter(
     return result′, a, A
 end
 
-# Finite squeezing along the axes given by `angles`, added to the measured
-# block's covariance. The 2x2 rotation lives on the quadratures of each measured
-# mode, whose positions within that block `_blockquadpositions` supplies, so one
-# routine covers both layouts. It is assembled on the host and added in one
-# operation, which keeps the caller's array backend untouched.
+# finite squeezing along `angles`, added to the measured block's covariance
 function _squeezeaxes(basis::SymplecticBasis, indlength::Int, angles, squeeze::Real)
     T = float(eltype(angles))
     N = zeros(T, 2*indlength, 2*indlength)::Matrix{T}
-    # positions of mode i's two quadratures within the measured block
     qpos, ppos = _blockquadpositions(basis, indlength)
     @inbounds for i in Base.OneTo(indlength)
         θ = angles[i]
@@ -286,7 +276,6 @@ function _squeezeaxes(basis::SymplecticBasis, indlength::Int, angles, squeeze::R
     return N
 end
 
-# The measured block is itself laid out in the state's basis, so mode i owns
-# rows (2i-1, 2i) pairwise and (i, i+indlength) blockwise.
+# the measured block carries the state's own layout
 _blockquadpositions(::QuadPairBasis, l::Int) = (i -> 2i - 1, i -> 2i)
 _blockquadpositions(::QuadBlockBasis, l::Int) = (i -> i, i -> i + l)
