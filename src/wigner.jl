@@ -13,7 +13,7 @@ function wigner(state::GaussianState, x::T) where {T}
     diff = x .- mean
     arg = -(1/2) * transpose(diff) * inv(V) * diff
 
-    return exp(arg)/((2pi)^nmodes * sqrt(det(V)))
+    return exp(arg)/((2pi)^nmodes * sqrt(_det(V)))
 end
 
 """
@@ -86,7 +86,7 @@ function wignerchar(state::GaussianState, xi::T) where {T}
     isequal(length(mean), length(xi)) || throw(ArgumentError(WIGNER_ERROR))
 
     V = state.covar
-    Omega = symplecticform(basis)
+    Omega = _symplecticform(basis, V)
 
     arg1 = -(1/2) * transpose(xi) * (Omega*V*transpose(Omega))*xi
     arg2 = im * transpose(Omega*mean) * xi

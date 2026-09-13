@@ -3,7 +3,7 @@
 
 Calculate the purity of a Gaussian state, defined by `1/sqrt((2/ħ) det(V))`.
 """
-purity(x::GaussianState) = (b = x.basis; (x.ħ/2)^(b.nmodes)/sqrt(det(x.covar)))
+purity(x::GaussianState) = (b = x.basis; (x.ħ/2)^(b.nmodes)/sqrt(_det(x.covar)))
 
 """
     entropy_vn(state::GaussianState; tol::Real = 128 * eps(1/2))
@@ -27,16 +27,27 @@ wherein it is understood that ``0 \\log(0) \\equiv 0``.
 * `tol`: Tolerance (exclusive) above the cut-off at ``1/2`` for computing ``f(x)``.
 """
 function entropy_vn(state::GaussianState{B, M, V}; tol::Real = real(eltype(V)) <: AbstractFloat ? 128 * eps(real(eltype(V))(1) / real(eltype(V))(2)) : 128 * eps(1/2)) where {B, M, V}
-    T = real(eltype(V))
-    T = T <: AbstractFloat ? T : Float64
-    S = _sympspectrum(state.covar, x -> (x - (T(1) / T(2))) > tol; pre = symplecticform(state.basis), invscale = state.ħ)
+    # `T` and `tol` are bound once, to a concrete type and value: the predicate
+    # below is compiled for the spectrum's backend, and a reassigned or
+    # abstractly-typed capture makes it uninferable there
+    Tv = real(eltype(V))
+    T = Tv <: AbstractFloat ? Tv : Float64
+    tol′, half = T(tol), T(1) / T(2)
+    S = _sympspectrum(state.covar, x -> (x - half) > tol′; pre = _symplecticform(state.basis, state.covar), invscale = state.ħ)
     return reduce(+, _entropy_vn.(S))
 end
 
 # this is the same as f(x)
-_entropy_vn(x) = x < 19 ?
-    (x + (1/2)) * log(x + (1/2)) - (x - (1/2)) * log(x - (1/2)) :
-    log(x) + 1 - (1/(24 * x^2)) - (1/(320 * x^4)) - (1/(2688 * x^6))
+# The constants are built at `typeof(x)` so the result stays in the input's
+# precision; with `Float64` literals a `Float32` argument returns
+# `Union{Float32,Float64}`, which is both a type instability and not something a
+# GPU broadcast can allocate an output for.
+function _entropy_vn(x::T) where {T<:Number}
+    half = T(1) / T(2)
+    return x < T(19) ?
+        (x + half) * log(x + half) - (x - half) * log(x - half) :
+        log(x) + one(T) - inv(T(24) * x^2) - inv(T(320) * x^4) - inv(T(2688) * x^6)
+end
 
 """
     fidelity(state1::GaussianState, state2::GaussianState; tol::Real = 128 * eps(1))
@@ -59,18 +70,20 @@ function fidelity(state1::GaussianState{B1, M1, V1}, state2::GaussianState{B2, M
     A = state2.mean - state1.mean
     B = state1.covar + state2.covar
     # many nasty factors of ħ ahead, tread carefully
-    output = state1.ħ^(state1.basis.nmodes/2) * exp(- (transpose(A) * (B \ A)) / 4) / (det(B))^(1/4)
-    A = symplecticform(state1.basis)
+    output = state1.ħ^(state1.basis.nmodes/2) * exp(- (transpose(A) * (B \ A)) / 4) / (_det(B))^(1/4)
+    A = _symplecticform(state1.basis, state1.covar)
     # slightly different from Banachi, Braunstein, and Pirandola
     B = (B \ ((A .* ((state1.ħ^2)/4)) + (state2.covar * A * state1.covar)))
-    T = real(promote_type(eltype(V1), eltype(V2)))
-    T = T <: AbstractFloat ? T : Float64
-    B = _sympspectrum(B, x -> (x - T(1)) >= tol; invscale = (state1.ħ / T(2)))
+    Tp = real(promote_type(eltype(V1), eltype(V2)))
+    T = Tp <: AbstractFloat ? Tp : Float64
+    tol′, one′ = T(tol), T(1)
+    B = _sympspectrum(B, x -> (x - one′) >= tol′; invscale = (state1.ħ / T(2)))
     return output * sqrt(reduce(*, _fidelity.(B)))
 end
 
 # this is the same as x + sqrt(x^2 - 1) when x > 0, but overflows gradually
-_fidelity(x) = x^2 < floatmax(typeof(x)) ? x + sqrt(x^2 - 1) : 2 * x
+_fidelity(x::T) where {T<:Number} =
+    x^2 < floatmax(T) ? x + sqrt(x^2 - one(T)) : T(2) * x
 
 """
     logarithmic_negativity(state::GaussianState, indices::Union{Integer, AbstractVector{<:Integer}}; tola::Real = 0, tolb::Real = 128 * eps(1))
@@ -101,7 +114,8 @@ function logarithmic_negativity(state::GaussianState{B, M, V}, indices::Union{In
     S = _tilde(state, indices)
     T = real(eltype(V))
     T = T <: AbstractFloat ? T : Float64
-    S = _sympspectrum(S, x -> x >= tola && (T(1) - x) >= tolb; pre = symplecticform(state.basis), invscale = (state.ħ / T(2)))
+    tola′, tolb′, one′ = T(tola), T(tolb), T(1)
+    S = _sympspectrum(S, x -> x >= tola′ && (one′ - x) >= tolb′; pre = _symplecticform(state.basis, state.covar), invscale = (state.ħ / T(2)))
     S = reduce(+, log.(S))
     # in case the reduction happened over an empty set
     return S < 0 ? -S : S
@@ -109,33 +123,23 @@ end
 
 function _tilde(state::GaussianState{B,M,V}, indices::Union{Integer, AbstractVector{<:Integer}}) where {B<:QuadPairBasis,M,V}
     nmodes = state.basis.nmodes
-    indices = collect(indices)
-    all(x -> x >= 1 && x <= nmodes, indices) || throw(ArgumentError(INDEX_ERROR))
-    T = copy(state.covar)
-    @inbounds for i in indices
-        # first loop is cache friendly, second one thrashes
-        @inbounds for j in Base.OneTo(2*nmodes)
-            T[j, 2*i] *= -1
-        end
-        @inbounds for j in Base.OneTo(2*nmodes)
-            T[2*i, j] *= -1
-        end
-    end
-    return T
+    idx = collect(indices)
+    all(x -> x >= 1 && x <= nmodes, idx) || throw(ArgumentError(INDEX_ERROR))
+    return _partialtranspose(state.covar, [2*i for i in idx])
 end
 function _tilde(state::GaussianState{B,M,V}, indices::Union{Integer, AbstractVector{<:Integer}}) where {B<:QuadBlockBasis,M,V}
     nmodes = state.basis.nmodes
-    indices = collect(indices)
-    all(x -> x >= 1 && x <= nmodes, indices) || throw(ArgumentError(INDEX_ERROR))
-    T = copy(state.covar)
-    @inbounds for i in indices
-        # first loop is cache friendly, second one thrashes
-        @inbounds for j in Base.OneTo(2*nmodes)
-            T[j, nmodes + i] *= -1
-        end
-        @inbounds for j in Base.OneTo(2*nmodes)
-            T[nmodes + i, j] *= -1
-        end
-    end
+    idx = collect(indices)
+    all(x -> x >= 1 && x <= nmodes, idx) || throw(ArgumentError(INDEX_ERROR))
+    return _partialtranspose(state.covar, [nmodes + i for i in idx])
+end
+
+# Partial transposition flips the sign of the momentum row and column of each
+# selected mode; `prows` carries their positions in the layout at hand. Whole
+# slices rather than per-element writes keep this valid on any array backend.
+function _partialtranspose(covar, prows)
+    T = copy(covar)
+    T[:, prows] .*= -1
+    T[prows, :] .*= -1
     return T
 end

@@ -76,80 +76,42 @@ true
 ```
 """
 function homodyne(
-    state::GaussianState{<:QuadPairBasis,Tm,Tc}, 
-    indices::R, 
+    state::GaussianState{<:QuadPairBasis,Tm,Tc},
+    indices::R,
     angles::G;
     rng::AbstractRNG = Random.default_rng(),
     squeeze::Real = 1e-12
 ) where {Tm,Tc,R,G}
-    basis = state.basis
-    nmodes = basis.nmodes
-    indlength = length(indices)
-    indlength <= nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
-    indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
-    # perform conditional mapping of Gaussian quantum state
-    result′, a, A = _homodyne_filter(rng, state, indices, angles; squeeze)
-    mean′ = zeros(eltype(Tm), 2*nmodes)
-    covar′ = Matrix{eltype(Tc)}((state.ħ/2)*I, 2*nmodes, 2*nmodes)
-    # fill in measured modes with vacuum states 
-    notindices = setdiff(1:nmodes, indices)
-    @inbounds for i in eachindex(notindices)
-        idx = notindices[i]
-        copyto!(@view(mean′[2idx-1:2idx]), @view(a[2i-1:2i]))
-        @inbounds for j in i:length(notindices)
-            otheridx = notindices[j]
-            covar′[2*idx-1, 2*otheridx-1] = A[2*i-1, 2*j-1]
-            covar′[2*idx-1, 2*otheridx] = A[2*i-1, 2*j]
-            covar′[2*idx, 2*otheridx-1] = A[2*i, 2*j-1]
-            covar′[2*idx, 2*otheridx] = A[2*i, 2*j]
-            covar′[2*otheridx-1, 2*idx-1] = A[2*j-1, 2*i-1]
-            covar′[2*otheridx-1, 2*idx] = A[2*j-1, 2*i]
-            covar′[2*otheridx, 2*idx-1] = A[2*j, 2*i-1]
-            covar′[2*otheridx, 2*idx] = A[2*j, 2*i]
-        end
-    end
-    # promote output array type to ensure it matches the input array type
-    mean′′ = Gabs._promote_output_vector(Tm, mean′, 2*nmodes)
-    covar′′ = Gabs._promote_output_matrix(Tc, covar′, 2*nmodes)
-    state′ = GaussianState(basis, mean′′, covar′′, ħ = state.ħ)
-    return Homodyne(result′, state′)
+    return _homodyne(rng, state, indices, angles, squeeze, Tm, Tc)
 end
 function homodyne(
-    state::GaussianState{<:QuadBlockBasis,Tm,Tc}, 
-    indices::R, 
+    state::GaussianState{<:QuadBlockBasis,Tm,Tc},
+    indices::R,
     angles::G;
     rng::AbstractRNG = Random.default_rng(),
     squeeze::Real = 1e-12
 ) where {Tm,Tc,R,G}
+    return _homodyne(rng, state, indices, angles, squeeze, Tm, Tc)
+end
+
+# As `_generaldyne`: the conditional moments of the unmeasured modes scattered
+# back onto a vacuum background.
+function _homodyne(rng::AbstractRNG, state::GaussianState, indices, angles, squeeze::Real, ::Type{Tm}, ::Type{Tc}) where {Tm,Tc}
     basis = state.basis
     nmodes = basis.nmodes
     indlength = length(indices)
     indlength <= nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
     indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
-    # perform conditional mapping of Gaussian quantum state
     result′, a, A = _homodyne_filter(rng, state, indices, angles; squeeze)
-    mean′ = zeros(eltype(Tm), 2*nmodes)
-    covar′ = Matrix{eltype(Tc)}((state.ħ/2)*I, 2*nmodes, 2*nmodes)
-    nmodes′ = nmodes - length(indices)
-    # fill in measured modes with vacuum states
     notindices = setdiff(1:nmodes, indices)
-    @inbounds for i in eachindex(notindices)
-        idx = notindices[i]
-        mean′[idx] = a[i]
-        mean′[idx+nmodes] = a[i+nmodes′]
-        @inbounds for j in i:length(notindices)
-            otheridx = notindices[j]
-            covar′[idx,otheridx] = A[i,j]
-            covar′[otheridx,idx] = A[j,i]
-            covar′[idx+nmodes,otheridx] = A[i+nmodes′,j]
-            covar′[idx,otheridx+nmodes] = A[i,j+nmodes′]
-            covar′[otheridx,idx+nmodes] = A[j,i+nmodes′]
-            covar′[otheridx+nmodes,idx] = A[j+nmodes′,i]
-            covar′[idx+nmodes,otheridx+nmodes] = A[i+nmodes′,j+nmodes′]
-            covar′[otheridx+nmodes,idx+nmodes] = A[j+nmodes′,i+nmodes′]
-        end
-    end
-    # promote output array type to ensure it matches the input array type
+    q = _quadindices(basis, notindices)
+    mean′ = similar(state.mean, 2*nmodes)
+    fill!(mean′, zero(eltype(state.mean)))
+    covar′ = similar(state.covar, 2*nmodes, 2*nmodes)
+    fill!(covar′, zero(eltype(state.covar)))
+    covar′[diagind(covar′)] .= eltype(state.covar)(state.ħ/2)
+    mean′[q] = a
+    covar′[q, q] = A
     mean′′ = Gabs._promote_output_vector(Tm, mean′, 2*nmodes)
     covar′′ = Gabs._promote_output_matrix(Tc, covar′, 2*nmodes)
     state′ = GaussianState(basis, mean′′, covar′′, ħ = state.ħ)
@@ -194,54 +156,14 @@ function Base.rand(
 end
 function Base.rand(
     rng::AbstractRNG,
-    ::Type{Homodyne}, 
-    state::GaussianState{<:QuadPairBasis,Tm,Tc}, 
-    indices::R, 
-    angles::G; 
+    ::Type{Homodyne},
+    state::GaussianState{<:QuadPairBasis,Tm,Tc},
+    indices::R,
+    angles::G;
     shots::Int = 1,
     squeeze::Real = 1e-12
 ) where {Tm,Tc,R,G}
-    basis = state.basis
-    indlength = length(indices)
-    indlength <= basis.nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
-    indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
-    nmodes′ = basis.nmodes - indlength
-    mean, covar = state.mean, state.covar
-    # write mean and covariance matrix of measured modes to vector `b` and matrix `B`, respectively
-    b, B = zeros(2*indlength), zeros(2*indlength, 2*indlength)
-    @inbounds for i in eachindex(indices)
-        idx = indices[i]
-        b[2i-1:2i] .= @view(mean[2idx-1:2idx])
-        @inbounds for j in eachindex(indices)
-            otheridx = indices[j]
-            if idx == otheridx
-                B[2i-1:2i, 2i-1:2i] .= @view(covar[2idx-1:2idx, 2idx-1:2idx])
-            else
-                B[2i-1:2i, 2j-1:2j] .= @view(covar[2idx-1:2idx, 2otheridx-1:2otheridx])
-                B[2j-1:2j, 2i-1:2i] .= @view(covar[2otheridx-1:2otheridx, 2idx-1:2idx])
-            end
-        end
-    end
-    # infinite squeezing along axis defined by `angles`
-    @inbounds for i in Base.OneTo(indlength)
-        θ = angles[i]
-        ct, st = cos(θ), sin(θ)
-        B[i,i] += ct^2 * squeeze + st^2 / squeeze
-        B[i,i+indlength] += ct * st * (squeeze - 1 / squeeze)
-        B[i+indlength,i] += ct * st * (squeeze - 1 / squeeze)
-        B[i+indlength,i+indlength] += st^2 * squeeze + ct^2 / squeeze
-    end
-    # sample from probability distribution by taking the displaced 
-    # Cholesky decomposition of the covariance matrix
-    symB = Symmetric(B)
-    L = cholesky(symB).L
-    buf = zeros(2*indlength)
-    results = zeros(2*indlength, shots)
-    @inbounds for i in Base.OneTo(shots)
-        mul!(@view(results[:,i]), L, randn!(rng, buf))
-        @view(results[:,i]) .+= b
-    end
-    return results
+    return _homodyne_samples(rng, state, indices, angles, shots, squeeze)
 end
 function Base.rand(
     ::Type{Homodyne}, 
@@ -256,66 +178,33 @@ function Base.rand(
 end
 function Base.rand(
     rng::AbstractRNG,
-    ::Type{Homodyne}, 
-    state::GaussianState{<:QuadBlockBasis,Tm,Tc}, 
-    indices::R, 
+    ::Type{Homodyne},
+    state::GaussianState{<:QuadBlockBasis,Tm,Tc},
+    indices::R,
     angles::G;
     shots::Int = 1,
     squeeze::Real = 1e-12
 ) where {Tm,Tc,R,G}
-    basis = state.basis
-    nmodes = basis.nmodes
-    indlength = length(indices)
-    indlength <= nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
-    indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
-    nmodes′ = nmodes - indlength
-    mean, covar = state.mean, state.covar
-    # write mean and covariance matrix of measured modes to vector `b` and matrix `B`, respectively
-    b, B = zeros(2*indlength), zeros(2*indlength, 2*indlength)
-    @inbounds for i in eachindex(indices)
-        idx = indices[i]
-        b[i] = mean[idx]
-        b[i+indlength] = mean[idx+nmodes]
-        @inbounds for j in eachindex(indices)
-            otheridx = indices[j]
-            if idx == otheridx
-                B[i, i] = covar[idx, idx]
-                B[i+indlength, i] = covar[idx+nmodes, idx]
-                B[i, i+indlength] = covar[idx, idx+nmodes]
-                B[i+indlength, i+indlength] = covar[idx+nmodes, idx+nmodes]
-            else
-                B[i, j] = covar[idx, otheridx]
-                B[i+indlength, j] = covar[idx+nmodes, otheridx]
-                B[i, j+indlength] = covar[idx, otheridx+nmodes]
-                B[i+indlength, j+indlength] = covar[idx+nmodes, otheridx+nmodes]
+    return _homodyne_samples(rng, state, indices, angles, shots, squeeze)
+end
 
-                B[j, i] = covar[otheridx, idx]
-                B[j+indlength, i] = covar[otheridx+nmodes, idx]
-                B[j, i+indlength] = covar[otheridx, idx+nmodes]
-                B[j+indlength, i+indlength] = covar[otheridx+nmodes, idx+nmodes]
-            end
-        end
-    end
-    # infinite squeezing along axis defined by `angles`
-    @inbounds for i in Base.OneTo(indlength)
-        θ = angles[i]
-        ct, st = cos(θ), sin(θ)
-        B[i,i] += ct^2 * squeeze + st^2 / squeeze
-        B[i,i+indlength] += ct * st * (squeeze - 1 / squeeze)
-        B[i+indlength,i] += ct * st * (squeeze - 1 / squeeze)
-        B[i+indlength,i+indlength] += st^2 * squeeze + ct^2 / squeeze
-    end
-    # sample from probability distribution by taking the displaced 
-    # Cholesky decomposition of the covariance matrix
-    symB = Symmetric(B)
-    L = cholesky(symB).L
-    buf = zeros(2*indlength)
-    results = zeros(2*indlength, shots)
-    @inbounds for i in Base.OneTo(shots)
-        mul!(@view(results[:,i]), L, randn!(rng, buf))
-        @view(results[:,i]) .+= b
-    end
-    return results
+# Homodyne outcomes are Gaussian with mean `b` and covariance `B` broadened by
+# the finite-squeezing term; as in `_generaldyne_samples`, all shots come from
+# one triangular product.
+function _homodyne_samples(rng::AbstractRNG, state::GaussianState, indices, angles, shots::Int, squeeze::Real)
+    basis = state.basis
+    indlength = length(indices)
+    indlength <= basis.nmodes || throw(ArgumentError(Gabs.INDEX_ERROR))
+    indlength == length(angles) || throw(ArgumentError(Gabs.GENERALDYNE_ERROR))
+    _, b, _, B, _ = _part_state(state, indices)
+    B = B .+ _like(B, _squeezeaxes(basis, indlength, angles, squeeze))
+    # `F.U'` names the same factor as `F.L`, but a backend whose Cholesky stores
+    # the upper factor builds `.L` by transposing element by element, which is not
+    # available on every array type.
+    L = cholesky(Symmetric(B)).U'
+    z = similar(b, 2*indlength, shots)
+    randn!(rng, z)
+    return L * z .+ b
 end
 
 function _homodyne_filter(
@@ -329,21 +218,15 @@ function _homodyne_filter(
     indlength = length(indices)
     nmodes′ = basis.nmodes - indlength
     a, b, A, B, C = _part_state(state, indices)
-    # infinite squeezing along axis defined by `angles`
-    @inbounds for i in Base.OneTo(indlength)
-        θ = angles[i]
-        ct, st = cos(θ), sin(θ)
-        B[2i-1,2i-1] += ct^2 * squeeze + st^2 / squeeze
-        B[2i-1,2i] += ct * st * (squeeze - 1 / squeeze)
-        B[2i,2i-1] += ct * st * (squeeze - 1 / squeeze)
-        B[2i,2i] += st^2 * squeeze + ct^2 / squeeze
-    end
+    B = B .+ _like(B, _squeezeaxes(basis, indlength, angles, squeeze))
     # sample from probability distribution by taking the displaced 
     # Cholesky decomposition of the covariance matrix
     symB = Symmetric(B)
-    L = cholesky(symB).L
-    resultmean = L * randn(rng, 2*indlength) + b
-    meandiff = resultmean - b
+    L = cholesky(symB).U'
+    z = similar(b, 2*indlength)
+    randn!(rng, z)
+    resultmean = L * z .+ b
+    meandiff = resultmean .- b
     # conditional mapping (see Serafini's Quantum Continuous Variables textbook for reference)
     buf = C * inv(symB)
     a .+= buf * meandiff
@@ -363,21 +246,15 @@ function _homodyne_filter(
     indlength = length(indices)
     nmodes′ = basis.nmodes - indlength
     a, b, A, B, C = _part_state(state, indices)
-    # infinite squeezing along axis defined by `angles`
-    @inbounds for i in Base.OneTo(indlength)
-        θ = angles[i]
-        ct, st = cos(θ), sin(θ)
-        B[i,i] += ct^2 * squeeze + st^2 / squeeze
-        B[i,i+indlength] += ct * st * (squeeze - 1 / squeeze)
-        B[i+indlength,i] += ct * st * (squeeze - 1 / squeeze)
-        B[i+indlength,i+indlength] += st^2 * squeeze + ct^2 / squeeze
-    end
+    B = B .+ _like(B, _squeezeaxes(basis, indlength, angles, squeeze))
     # sample from probability distribution by taking the displaced 
     # Cholesky decomposition of the covariance matrix
     symB = Symmetric(B)
-    L = cholesky(symB).L
-    resultmean = L * randn(rng, 2*indlength) + b
-    meandiff = resultmean - b
+    L = cholesky(symB).U'
+    z = similar(b, 2*indlength)
+    randn!(rng, z)
+    resultmean = L * z .+ b
+    meandiff = resultmean .- b
     # conditional mapping (see Serafini's Quantum Continuous Variables textbook for reference)
     buf = C * inv(symB)
     a .+= buf * meandiff
@@ -386,3 +263,30 @@ function _homodyne_filter(
     result′ = Gabs._promote_output_vector(Tm, resultmean, 2*indlength)
     return result′, a, A
 end
+
+# Finite squeezing along the axes given by `angles`, added to the measured
+# block's covariance. The 2x2 rotation lives on the quadratures of each measured
+# mode, whose positions `_quadindices` supplies, so one routine covers both
+# layouts. It is assembled on the host and added in one operation, which keeps
+# the caller's array backend untouched.
+function _squeezeaxes(basis::SymplecticBasis, indlength::Int, angles, squeeze::Real)
+    T = float(eltype(angles))
+    N = zeros(T, 2*indlength, 2*indlength)::Matrix{T}
+    # positions of mode i's two quadratures within the measured block
+    qpos, ppos = _blockquadpositions(basis, indlength)
+    @inbounds for i in Base.OneTo(indlength)
+        θ = angles[i]
+        ct, st = cos(θ), sin(θ)
+        qi, pi_ = qpos(i), ppos(i)
+        N[qi, qi]  += ct^2 * squeeze + st^2 / squeeze
+        N[qi, pi_] += ct * st * (squeeze - 1 / squeeze)
+        N[pi_, qi] += ct * st * (squeeze - 1 / squeeze)
+        N[pi_, pi_] += st^2 * squeeze + ct^2 / squeeze
+    end
+    return N
+end
+
+# The measured block is itself laid out in the state's basis, so mode i owns
+# rows (2i-1, 2i) pairwise and (i, i+indlength) blockwise.
+_blockquadpositions(::QuadPairBasis, l::Int) = (i -> 2i - 1, i -> 2i)
+_blockquadpositions(::QuadBlockBasis, l::Int) = (i -> i, i -> i + l)

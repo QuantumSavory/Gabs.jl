@@ -238,86 +238,27 @@ function tensor(op1::GaussianChannel, op2::GaussianChannel)
     return GaussianChannel(op1.basis ⊕ op2.basis, disp, transform, noise; ħ = op1.ħ)
 end
 function _tensor(op1::GaussianChannel{B1,D1,T1}, op2::GaussianChannel{B2,D2,T2}) where {B1<:QuadPairBasis,B2<:QuadPairBasis,D1,D2,T1,T2}
-    basis1, basis2 = op1.basis, op2.basis
-    nmodes1, nmodes2 = basis1.nmodes, basis2.nmodes
-    nmodes = nmodes1 + nmodes2
-    block1, block2 = Base.OneTo(2*nmodes1), Base.OneTo(2*nmodes2)
-    # initialize direct sum of displacement vectors
-    disp1, disp2 = op1.disp, op2.disp
-    Dt = promote_type(eltype(disp1), eltype(disp2))
-    disp′ = zeros(Dt, 2*nmodes)
-    @inbounds for i in block1
-        disp′[i] = disp1[i]
-    end
-    @inbounds for i in block2
-        disp′[i+2*nmodes1] = disp2[i]
-    end
-    # initialize direct sum of transform and noise matrices
-    trans1, trans2 = op1.transform, op2.transform
-    Tt = promote_type(eltype(trans1), eltype(trans2))
-    transform′ = zeros(Tt, 2*nmodes, 2*nmodes)
-    noise1, noise2 = op1.noise, op2.noise
-    noise′ = zeros(Tt, 2*nmodes, 2*nmodes)
-    @inbounds for i in block1, j in block1
-        transform′[i,j] = trans1[i,j]
-        noise′[i,j] = noise1[i,j]
-    end
-    @inbounds for i in block2, j in block2
-        transform′[i+2*nmodes1,j+2*nmodes1] = trans2[i,j]
-        noise′[i+2*nmodes1,j+2*nmodes1] = noise2[i,j]
-    end
-    # extract output array types
-    disp′′ = _promote_output_vector(typeof(disp1), typeof(disp2), disp′)
-    transform′′ = _promote_output_matrix(typeof(trans1), typeof(trans2), transform′)
-    noise′′ = _promote_output_matrix(typeof(noise1), typeof(noise2), noise′)
-    return disp′′, transform′′, noise′′
+    return _directsumchannel(op1, op2, _tensorperm(op1.basis, op2.basis))
 end
 function _tensor(op1::GaussianChannel{B1,D1,T1}, op2::GaussianChannel{B2,D2,T2}) where {B1<:QuadBlockBasis,B2<:QuadBlockBasis,D1,D2,T1,T2}
-    basis1, basis2 = op1.basis, op2.basis
-    nmodes1, nmodes2 = basis1.nmodes, basis2.nmodes
-    nmodes = nmodes1 + nmodes2
-    block1, block2 = Base.OneTo(nmodes1), Base.OneTo(nmodes2)
-    # initialize direct sum of displacement vectors
-    disp1, disp2 = op1.disp, op2.disp
-    Dt = promote_type(eltype(disp1), eltype(disp2))
-    disp′ = zeros(Dt, 2*nmodes)
-    @inbounds for i in block1
-        disp′[i] = disp1[i]
-        disp′[i+nmodes] = disp1[i+nmodes1]
-    end
-    @inbounds for i in block2
-        disp′[i+nmodes1] = disp2[i]
-        disp′[i+nmodes+nmodes1] = disp2[i+nmodes2]
-    end
-    # initialize direct sum of transform and noise matrices
-    trans1, trans2 = op1.transform, op2.transform
-    Tt = promote_type(eltype(trans1), eltype(trans2))
-    transform′ = zeros(Tt, 2*nmodes, 2*nmodes)
-    noise1, noise2 = op1.noise, op2.noise
-    noise′ = zeros(Tt, 2*nmodes, 2*nmodes)
-    @inbounds for i in block1, j in block1
-        transform′[i,j] = trans1[i,j]
-        transform′[i,j+nmodes] = trans1[i,j+nmodes1]
-        transform′[i+nmodes,j] = trans1[i+nmodes1,j]
-        transform′[i+nmodes,j+nmodes] = trans1[i+nmodes1,j+nmodes1]
+    return _directsumchannel(op1, op2, _tensorperm(op1.basis, op2.basis))
+end
 
-        noise′[i,j] = noise1[i,j]
-        noise′[i,j+nmodes] = noise1[i,j+nmodes1]
-        noise′[i+nmodes,j] = noise1[i+nmodes1,j]
-        noise′[i+nmodes,j+nmodes] = noise1[i+nmodes1,j+nmodes1]
+# As `_directsummoments`, but a channel carries a noise matrix alongside its
+# transform and both are relabelled the same way.
+function _directsumchannel(op1::GaussianChannel, op2::GaussianChannel, perm)
+    disp1, trans1, noise1 = op1.disp, op1.transform, op1.noise
+    disp2, trans2, noise2 = op2.disp, op2.transform, op2.noise
+    n1, n2 = length(disp1), length(disp2)
+    d1, d2 = _codevice(disp1, disp2)
+    disp′ = vcat(d1, d2)
+    transform′ = _blockdiag(trans1, trans2, n1, n2)
+    noise′ = _blockdiag(noise1, noise2, n1, n2)
+    if perm !== nothing
+        disp′ = disp′[perm]
+        transform′ = transform′[perm, perm]
+        noise′ = noise′[perm, perm]
     end
-    @inbounds for i in block2, j in block2
-        transform′[i+nmodes1,j+nmodes1] = trans2[i,j]
-        transform′[i+nmodes1,j+nmodes+nmodes1] = trans2[i,j+nmodes2]
-        transform′[i+nmodes+nmodes1,j+nmodes1] = trans2[i+nmodes2,j]
-        transform′[i+nmodes+nmodes1,j+nmodes+nmodes1] = trans2[i+nmodes2,j+nmodes2]
-
-        noise′[i+nmodes1,j+nmodes1] = noise2[i,j]
-        noise′[i+nmodes1,j+nmodes+nmodes1] = noise2[i,j+nmodes2]
-        noise′[i+nmodes+nmodes1,j+nmodes1] = noise2[i+nmodes2,j]
-        noise′[i+nmodes+nmodes1,j+nmodes+nmodes1] = noise2[i+nmodes2,j+nmodes2]
-    end
-    # extract output array types
     disp′′ = _promote_output_vector(typeof(disp1), typeof(disp2), disp′)
     transform′′ = _promote_output_matrix(typeof(trans1), typeof(trans2), transform′)
     noise′′ = _promote_output_matrix(typeof(noise1), typeof(noise2), noise′)
@@ -343,36 +284,7 @@ end
 function embed(
     basis::QuadPairBasis, indices::Vector{<:Int}, op::GaussianChannel{<:QuadPairBasis,D,S}
 ) where {D,S}
-    @assert length(indices) == op.basis.nmodes "Number of indices must match number of modes in the channel"
-    @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
-
-    total_modes = basis.nmodes
-    sub_modes = op.basis.nmodes
-    disp = zeros(eltype(op.disp), 2 * total_modes)
-    transform = Matrix{eltype(op.transform)}(I, 2 * total_modes, 2 * total_modes)
-    noise = zeros(eltype(op.noise), 2 * total_modes, 2 * total_modes)
-
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx = indices[i]
-        disp[2idx-1] = op.disp[2i-1]
-        disp[2idx] = op.disp[2i]
-    end
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx_i = indices[i]
-        @inbounds for j in Base.OneTo(sub_modes)
-            idx_j = indices[j]
-            transform[2idx_i-1, 2idx_j-1] = op.transform[2i-1, 2j-1]
-            transform[2idx_i-1, 2idx_j] = op.transform[2i-1, 2j]
-            transform[2idx_i, 2idx_j-1] = op.transform[2i, 2j-1]
-            transform[2idx_i, 2idx_j] = op.transform[2i, 2j]
-
-            noise[2idx_i-1, 2idx_j-1] = op.noise[2i-1, 2j-1]
-            noise[2idx_i-1, 2idx_j] = op.noise[2i-1, 2j]
-            noise[2idx_i, 2idx_j-1] = op.noise[2i, 2j-1]
-            noise[2idx_i, 2idx_j] = op.noise[2i, 2j]
-        end
-    end
-    return GaussianChannel(basis, disp, transform, noise; ħ = op.ħ)
+    return _embedchannel(basis, indices, op)
 end
 function embed(
     basis::QuadBlockBasis, index::Int, op::GaussianChannel{<:QuadBlockBasis,D,S}
@@ -382,35 +294,26 @@ end
 function embed(
     basis::QuadBlockBasis, indices::Vector{<:Int}, op::GaussianChannel{<:QuadBlockBasis,D,S}
 ) where {D,S}
+    return _embedchannel(basis, indices, op)
+end
+
+# As `_embedunitary`, with the noise matrix scattered onto a zero background:
+# the untouched modes pick up no noise.
+function _embedchannel(basis::SymplecticBasis, indices::Vector{<:Int}, op::GaussianChannel)
     @assert length(indices) == op.basis.nmodes "Number of indices must match number of modes in the channel"
     @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
-
-    total_modes = basis.nmodes
-    sub_modes = op.basis.nmodes
-    disp = zeros(eltype(op.disp), 2 * total_modes)
-    transform = Matrix{eltype(op.transform)}(I, 2 * total_modes, 2 * total_modes)
-    noise = zeros(eltype(op.noise), 2 * total_modes, 2 * total_modes)
-
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx = indices[i]
-        disp[idx] = op.disp[i]
-        disp[idx + total_modes] = op.disp[i + sub_modes]
-    end
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx_i = indices[i]
-        @inbounds for j in Base.OneTo(sub_modes)
-            idx_j = indices[j]
-            transform[idx_i, idx_j] = op.transform[i, j]
-            transform[idx_i, idx_j + total_modes] = op.transform[i, j + sub_modes]
-            transform[idx_i + total_modes, idx_j] = op.transform[i + sub_modes, j]
-            transform[idx_i + total_modes, idx_j + total_modes] = op.transform[i + sub_modes, j + sub_modes]
-
-            noise[idx_i, idx_j] = op.noise[i, j]
-            noise[idx_i, idx_j + total_modes] = op.noise[i, j + sub_modes]
-            noise[idx_i + total_modes, idx_j] = op.noise[i + sub_modes, j]
-            noise[idx_i + total_modes, idx_j + total_modes] = op.noise[i + sub_modes, j + sub_modes]
-        end
-    end
+    dim = 2 * basis.nmodes
+    q = _quadindices(basis, indices)
+    disp = similar(op.disp, dim)
+    fill!(disp, zero(eltype(op.disp)))
+    transform = similar(op.transform, dim, dim)
+    fill!(transform, zero(eltype(op.transform)))
+    transform[diagind(transform)] .= oneunit(eltype(op.transform))
+    noise = similar(op.noise, dim, dim)
+    fill!(noise, zero(eltype(op.noise)))
+    disp[q] = op.disp
+    transform[q, q] = op.transform
+    noise[q, q] = op.noise
     return GaussianChannel(basis, disp, transform, noise; ħ = op.ħ)
 end
 
@@ -462,36 +365,14 @@ noise: 4×4 Matrix{Float64}:
 ```
 """
 function changebasis(::Type{B1}, op::GaussianChannel{B2,D,S}) where {B1<:QuadBlockBasis,B2<:QuadPairBasis,D,S}
-    basis = op.basis
-    nmodes = basis.nmodes
-    St = eltype(S)
-    T = zeros(St, 2*nmodes, 2*nmodes)
-    @inbounds for i in Base.OneTo(2*nmodes), j in Base.OneTo(2*nmodes)
-        if (j == 2*i-1) || (j + 2*nmodes == 2*i)
-            T[i,j] = oneunit(St)
-        end
-    end
-    T = typeof(T) == S ? T : S(T)
-    disp = T * op.disp
-    transform = T * op.transform * transpose(T)
-    noise = T * op.noise * transpose(T)
-    return GaussianChannel(B1(nmodes), disp, transform, noise)
+    nmodes = op.basis.nmodes
+    p = _basisperm(B1, nmodes)
+    return GaussianChannel(B1(nmodes), op.disp[p], op.transform[p, p], op.noise[p, p]; ħ = op.ħ)
 end
 function changebasis(::Type{B1}, op::GaussianChannel{B2,D,S}) where {B1<:QuadPairBasis,B2<:QuadBlockBasis,D,S}
-    basis = op.basis
-    nmodes = basis.nmodes
-    St = eltype(S)
-    T = zeros(St, 2*nmodes, 2*nmodes)
-    @inbounds for i in Base.OneTo(2*nmodes), j in Base.OneTo(2*nmodes)
-        if (i == 2*j-1) || (i + 2*nmodes == 2*j)
-            T[i,j] = oneunit(St)
-        end
-    end
-    T = typeof(T) == S ? T : S(T)
-    disp = T * op.disp
-    transform = T * op.transform * transpose(T)
-    noise = T * op.noise * transpose(T)
-    return GaussianChannel(B1(nmodes), disp, transform, noise)
+    nmodes = op.basis.nmodes
+    p = _basisperm(B1, nmodes)
+    return GaussianChannel(B1(nmodes), op.disp[p], op.transform[p, p], op.noise[p, p]; ħ = op.ħ)
 end
 changebasis(::Type{<:QuadBlockBasis}, op::GaussianChannel{<:QuadBlockBasis,D,S}) where {D,S} = op
 changebasis(::Type{<:QuadPairBasis}, op::GaussianChannel{<:QuadPairBasis,D,S}) where {D,S} = op

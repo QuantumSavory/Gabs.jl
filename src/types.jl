@@ -151,30 +151,21 @@ function apply!(
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
-    quad_indices = Vector{Int}(undef, 2length(indices))
-    @inbounds for (k, i) in enumerate(indices)
-        quad_indices[2k-1] = 2i - 1
-        quad_indices[2k]   = 2i
-    end
+    quad_indices = _quadindices(state.basis, indices)
+    return _applyunitary!(state, quad_indices, op)
+end
+function _applyunitary!(state::GaussianState, quad_indices, op::GaussianUnitary)
     d, S = op.disp, op.symplectic
-    m = length(quad_indices)
-    n = size(state.covar, 1)
-    mean_sub = @view state.mean[quad_indices]
-    covar_row = @view state.covar[quad_indices, :]
-    covar_col = @view state.covar[:, quad_indices]
-    # single scratch buffer, reused across the three products (reshaped for the column update)
-    buf = similar(state.covar, m, n)
-    buf_vec = @view buf[1:m]
-    # x̄[q] ← S x̄[q] + d
-    mul!(buf_vec, S, mean_sub)
-    mean_sub .= buf_vec .+ d
-    # V[q,:] ← S V[q,:]
-    mul!(buf, S, covar_row)
-    covar_row .= buf
-    # V[:,q] ← V[:,q] Sᵀ (reads the just-updated V[q,q] block)
-    buf_col = reshape(buf, n, m)
-    mul!(buf_col, covar_col, transpose(S))
-    covar_col .= buf_col
+    # Gathered rows/columns are materialized rather than written through a view:
+    # an index-vector view is not strided, so it cannot be a `mul!` destination
+    # on array backends whose GEMM requires strided memory.
+    mean_sub = state.mean[quad_indices]
+    state.mean[quad_indices] = S * mean_sub .+ d
+    covar_row = state.covar[quad_indices, :]
+    state.covar[quad_indices, :] = S * covar_row
+    # reads the just-updated V[q,q] block, so this must follow the row update
+    covar_col = state.covar[:, quad_indices]
+    state.covar[:, quad_indices] = covar_col * transpose(S)
     return state
 end
 function apply!(
@@ -185,34 +176,8 @@ function apply!(
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
-    l = length(indices)
-    quad_indices = Vector{Int}(undef, 2l)
-    @inbounds for (k, i) in enumerate(indices)
-        quad_indices[k]   = i
-        quad_indices[k+l] = i + state.basis.nmodes
-    end
-    d, S = op.disp, op.symplectic
-    m = length(quad_indices)
-    n = size(state.covar, 1)
-    mean_sub = @view state.mean[quad_indices]
-    covar_row = @view state.covar[quad_indices, :]
-    covar_col = @view state.covar[:, quad_indices]
-    # single scratch buffer, reused across the three products (reshaped for the column update)
-    buf = similar(state.covar, m, n)
-    buf_vec = @view buf[1:m]
-    # x̄[q] ← S x̄[q] + d
-    mul!(buf_vec, S, mean_sub)
-    mean_sub .= buf_vec .+ d
-    # V[q,:] ← S V[q,:]
-    mul!(buf, S, covar_row)
-    covar_row .= buf
-    # V[:,q] ← V[:,q] Sᵀ (reads the just-updated V[q,q] block)
-    buf_col = reshape(buf, n, m)
-    mul!(buf_col, covar_col, transpose(S))
-    covar_col .= buf_col
-    return state
+    return _applyunitary!(state, _quadindices(state.basis, indices), op)
 end
-
 Base.@deprecate(
     apply!(
         state::GaussianState,
@@ -324,34 +289,7 @@ function apply!(
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
-    quad_indices = Vector{Int}(undef, 2length(indices))
-    @inbounds for (k, i) in enumerate(indices)
-        quad_indices[2k-1] = 2i - 1
-        quad_indices[2k]   = 2i
-    end
-    d, T, N = op.disp, op.transform, op.noise
-    m = length(quad_indices)
-    n = size(state.covar, 1)
-    mean_sub = @view state.mean[quad_indices]
-    covar_row = @view state.covar[quad_indices, :]
-    covar_col = @view state.covar[:, quad_indices]
-    # single scratch buffer, reused across the three products (reshaped for the column update)
-    buf = similar(state.covar, m, n)
-    buf_vec = @view buf[1:m]
-    # x̄[q] ← T x̄[q] + d
-    mul!(buf_vec, T, mean_sub)
-    mean_sub .= buf_vec .+ d
-    # V[q,:] ← T V[q,:]
-    mul!(buf, T, covar_row)
-    covar_row .= buf
-    # V[:,q] ← V[:,q] Tᵀ (reads the just-updated V[q,q] block)
-    buf_col = reshape(buf, n, m)
-    mul!(buf_col, covar_col, transpose(T))
-    covar_col .= buf_col
-    # V[q,q] ← V[q,q] + N after both covariance transformations
-    covar_sub = @view state.covar[quad_indices, quad_indices]
-    covar_sub .+= N
-    return state
+    return _applychannel!(state, _quadindices(state.basis, indices), op)
 end
 function apply!(
     state::GaussianState{B,M,V},
@@ -361,34 +299,19 @@ function apply!(
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
-    l = length(indices)
-    quad_indices = Vector{Int}(undef, 2l)
-    @inbounds for (k, i) in enumerate(indices)
-        quad_indices[k]   = i
-        quad_indices[k+l] = i + state.basis.nmodes
-    end
+    return _applychannel!(state, _quadindices(state.basis, indices), op)
+end
+function _applychannel!(state::GaussianState, quad_indices, op::GaussianChannel)
     d, T, N = op.disp, op.transform, op.noise
-    m = length(quad_indices)
-    n = size(state.covar, 1)
-    mean_sub = @view state.mean[quad_indices]
-    covar_row = @view state.covar[quad_indices, :]
-    covar_col = @view state.covar[:, quad_indices]
-    # single scratch buffer, reused across the three products (reshaped for the column update)
-    buf = similar(state.covar, m, n)
-    buf_vec = @view buf[1:m]
-    # x̄[q] ← T x̄[q] + d
-    mul!(buf_vec, T, mean_sub)
-    mean_sub .= buf_vec .+ d
-    # V[q,:] ← T V[q,:]
-    mul!(buf, T, covar_row)
-    covar_row .= buf
-    # V[:,q] ← V[:,q] Tᵀ (reads the just-updated V[q,q] block)
-    buf_col = reshape(buf, n, m)
-    mul!(buf_col, covar_col, transpose(T))
-    covar_col .= buf_col
+    # see `_applyunitary!` for why the gathered blocks are materialized
+    mean_sub = state.mean[quad_indices]
+    state.mean[quad_indices] = T * mean_sub .+ d
+    covar_row = state.covar[quad_indices, :]
+    state.covar[quad_indices, :] = T * covar_row
+    covar_col = state.covar[:, quad_indices]
+    state.covar[:, quad_indices] = covar_col * transpose(T)
     # V[q,q] ← V[q,q] + N after both covariance transformations
-    covar_sub = @view state.covar[quad_indices, quad_indices]
-    covar_sub .+= N
+    state.covar[quad_indices, quad_indices] = state.covar[quad_indices, quad_indices] .+ N
     return state
 end
 
@@ -603,11 +526,19 @@ symplectic: 2×2 Matrix{Float64}:
 julia> isgaussian(op)
 true
 ```
+
+!!! note
+    The default `atol = 0` asks for the semidefiniteness test to hold exactly.
+    A pure state sits on the boundary, where its smallest eigenvalues are zero,
+    so whether they come back as `0.0` or as `-2e-16` is up to the eigensolver;
+    LAPACK and CUSOLVER round these differently, and so may two CPU builds. Pass
+    an `atol` on the order of the state's conditioning, say `atol = 1e-12`, when
+    the answer should not depend on that.
 """
 function isgaussian(x::GaussianState; atol::R1 = 0, rtol::R2 = atol) where {R1<:Real, R2<:Real}
     covar = x.covar
     basis = x.basis
-    form = symplecticform(Matrix{ComplexF64}, basis)
+    form = _complexform(basis, covar)
     @. form = im * (x.ħ/2) * form + covar
     eigs = real(eigvals(form))
     return all(i -> ((i >= 0) || isapprox(i, 0.0; atol = atol, rtol = rtol)), eigs)
@@ -618,7 +549,7 @@ end
 function isgaussian(x::GaussianChannel; atol::R1 = 0, rtol::R2 = atol) where {R1<:Real, R2<:Real} 
     transform, noise = x.transform, x.noise
     basis = x.basis
-    form = symplecticform(Matrix{ComplexF64}, basis)
+    form = _complexform(basis, transform)
     prod = transform * form * transform'
     @. form = noise + im*form - im*prod
     eigs = real(eigvals(form))

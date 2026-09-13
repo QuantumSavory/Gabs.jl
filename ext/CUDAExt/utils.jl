@@ -1,63 +1,73 @@
-Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out) where {T1<:CuVector, T2<:CuVector}
-    return CuArray(vec_out)
+# Output container selection, mirroring `ext/StaticArraysExt/utils.jl`.
+#
+# `tensor` and `ptrace` compute into a plain `Array` and then ask which container
+# the result should live in. `promote_type(CuVector{T}, Vector{T})` is `Any`, so
+# the mixed pairs need their own methods rather than falling through to the
+# generic one.
+
+Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out) where {T1<:CuVector,T2<:CuVector}
+    return CuVector{promote_type(eltype(T1), eltype(T2))}(vec_out)
+end
+Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out) where {T1<:CuVector,T2<:AbstractVector}
+    return CuVector{promote_type(eltype(T1), eltype(T2))}(vec_out)
+end
+Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out) where {T1<:AbstractVector,T2<:CuVector}
+    return CuVector{promote_type(eltype(T1), eltype(T2))}(vec_out)
+end
+Base.@propagate_inbounds function _promote_output_vector(::Type{T}, vec_out, vec_length::Int) where {T<:CuVector}
+    return CuVector{eltype(T)}(vec_out)
 end
 
-Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out) where {T1<:CuVector, T2<:Vector}
-    return CuArray(vec_out)
+Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out) where {T1<:CuMatrix,T2<:CuMatrix}
+    return CuMatrix{promote_type(eltype(T1), eltype(T2))}(mat_out)
+end
+Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out) where {T1<:CuMatrix,T2<:AbstractMatrix}
+    return CuMatrix{promote_type(eltype(T1), eltype(T2))}(mat_out)
+end
+Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out) where {T1<:AbstractMatrix,T2<:CuMatrix}
+    return CuMatrix{promote_type(eltype(T1), eltype(T2))}(mat_out)
+end
+Base.@propagate_inbounds function _promote_output_matrix(::Type{T}, mat_out, out_dim::Int) where {T<:CuMatrix}
+    return CuMatrix{eltype(T)}(mat_out)
+end
+Base.@propagate_inbounds function _promote_output_matrix(::Type{T}, mat_out, out_dim::Tuple) where {T<:CuMatrix}
+    return CuMatrix{eltype(T)}(mat_out)
 end
 
-Base.@propagate_inbounds function _promote_output_vector(::Type{T1}, ::Type{T2}, vec_out) where {T1<:Vector, T2<:CuVector}
-    return CuArray(vec_out)
+# Determinants.
+#
+# `LinearAlgebra.det`/`logdet` go through LU and then read the diagonal of the
+# factor one element at a time, which CUDA disallows. Every matrix Gabs takes a
+# determinant of is a covariance matrix, so it is symmetric positive definite and
+# Cholesky applies -- and is both cheaper and more stable than LU here.
+
+function _det(A::CuMatrix)
+    d = diag(cholesky(Symmetric(A)).U)
+    return prod(d)^2
 end
 
-Base.@propagate_inbounds function _promote_output_vector(::Type{<:CuVector}, vec_out, vec_length::Int)
-    return CuArray(vec_out)
+function _logdet(A::CuMatrix)
+    d = diag(cholesky(Symmetric(A)).U)
+    return 2 * sum(log, d)
 end
 
-Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out) where {T1<:CuMatrix, T2<:CuMatrix}
-    return CuArray(mat_out)
-end
+# The symplectic form has to be built on the device that holds the data it
+# multiplies; `symplecticform(basis)` alone is always a host `Matrix{Float64}`.
 
-Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out) where {T1<:CuMatrix, T2<:Matrix}
-    return CuArray(mat_out)
-end
+_symplecticform(basis::SymplecticBasis, x::CuArray) =
+    CuMatrix{real(eltype(x))}(symplecticform(basis))
 
-Base.@propagate_inbounds function _promote_output_matrix(::Type{T1}, ::Type{T2}, mat_out) where {T1<:Matrix, T2<:CuMatrix}
-    return CuArray(mat_out)
-end
+_complexform(basis::SymplecticBasis, x::CuArray) =
+    CuMatrix{complex(real(eltype(x)))}(symplecticform(basis))
 
-Base.@propagate_inbounds function _promote_output_matrix(::Type{<:CuMatrix}, mat_out, out_dim::Int)
-    return CuArray(mat_out)
-end
+# Auxiliary matrices (a generaldyne projection, a homodyne squeezing term) are
+# assembled on the host; they have to reach the device before being combined
+# with moments that live there.
+_like(x::CuArray, A::AbstractMatrix) = CuMatrix{eltype(x)}(A)
+_like(::CuArray, A::CuMatrix) = A
 
-Base.@propagate_inbounds function _promote_output_matrix(::Type{<:CuMatrix}, mat_out, out_dim::Tuple)
-    return CuArray(mat_out)
-end
-
-"""
-    gpu_fallback_warning()
-
-Issue warning when falling back to CPU due to CUDA unavailability.
-"""
-function gpu_fallback_warning()
-    if !CUDA_AVAILABLE
-        @warn "CUDA not available. Falling back to CPU computation. Install CUDA.jl and ensure GPU drivers are properly configured for GPU acceleration."
-    end
-end
-
-"""
-    detect_array_device_type(x::AbstractArray)
-
-Detect device type of array using type introspection.
-"""
-function detect_array_device_type(x::CuArray)
-    return :gpu, eltype(x), size(x)
-end
-
-function detect_array_device_type(x::AbstractArray) 
-    return :cpu, eltype(x), size(x)
-end
-
-function device(x::CuArray)
-    return :gpu
-end
+# A tensor product may pair a device operand with a host one; the result belongs
+# on the device, so the host side is moved there before they are combined.
+_codevice(A::CuArray, B::CuArray) = (A, B)
+_codevice(A::CuArray, B::AbstractArray) = (A, CuArray{promote_type(eltype(A), eltype(B))}(B))
+_codevice(A::AbstractArray, B::CuArray) = (CuArray{promote_type(eltype(A), eltype(B))}(A), B)

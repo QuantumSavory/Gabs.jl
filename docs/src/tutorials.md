@@ -175,6 +175,53 @@ Use [Latexify](https://github.com/korsbo/Latexify.jl) to render the covariance m
 
 ## GPU Acceleration
 
+A GPU array is a custom array like any other, so the section above already
+describes how to use one: load [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl)
+and name `CuVector`/`CuMatrix` where the previous examples named `SVector` and
+`SMatrix`.
+
+```julia
+julia> using CUDA
+
+julia> state = squeezedstate(CuVector{Float32}, CuMatrix{Float32}, QuadPairBasis(1), 0.5, pi/4)
+GaussianState for 1 mode.
+  symplectic basis: QuadPairBasis
+mean: 2-element CuArray{Float32, 1, CUDA.DeviceMemory}:
+ 0.0
+ 0.0
+covariance: 2×2 CuArray{Float32, 2, CUDA.DeviceMemory}:
+  0.712088  -0.830993
+ -0.830993   2.37407
+```
+
+Loading CUDA.jl brings in a small extension that teaches Gabs.jl how to keep
+results on the device. Every predefined state, unitary and channel accepts the
+array type the same way, and the operations between them — `*`, [`apply!`](@ref),
+[`tensor`](@ref), [`ptrace`](@ref), [`embed`](@ref), [`changebasis`](@ref),
+[`wigner`](@ref), the metrics, the random constructors and the measurements —
+give back objects whose moments are still `CuArray`s:
+
+```julia
+julia> op = beamsplitter(CuVector{Float32}, CuMatrix{Float32}, QuadPairBasis(2), 0.4);
+
+julia> out = op * (state ⊗ state);
+
+julia> typeof(out.covar)
+CuArray{Float32, 2, CUDA.DeviceMemory}
+```
+
+A host operand mixed with a device one is moved to the device, so
+`state ⊗ cpu_state` also returns a GPU-backed state. To bring a result back,
+convert its fields with `Array`.
+
+!!! note
+    Moving to the GPU pays off once the covariance matrices are large enough to
+    hide the cost of launching a kernel. On an RTX 2080 Ti, applying a Gaussian
+    unitary to a state breaks even at roughly 64 modes and is about 85× faster
+    at 1024; below about 32 modes the CPU is quicker. The same holds for drawing
+    measurement samples, where the gain comes from asking for many shots at once
+    (about 7× at 10⁴ shots) rather than from any single sample being faster.
+
 ## Multithreading
 
 ## Benchmarking and Profiling

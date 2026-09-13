@@ -556,73 +556,12 @@ function tensor(op1::GaussianUnitary, op2::GaussianUnitary)
     return GaussianUnitary(op1.basis ⊕ op2.basis, disp, symplectic; ħ = op1.ħ)
 end
 function _tensor(op1::GaussianUnitary{B1,D1,S1}, op2::GaussianUnitary{B2,D2,S2}) where {B1<:QuadPairBasis,B2<:QuadPairBasis,D1,D2,S1,S2}
-    basis1, basis2 = op1.basis, op2.basis
-    nmodes1, nmodes2 = basis1.nmodes, basis2.nmodes
-    nmodes = nmodes1 + nmodes2
-    block1, block2 = Base.OneTo(2*nmodes1), Base.OneTo(2*nmodes2)
-    # initialize direct sum of displacement vectors
-    disp1, disp2 = op1.disp, op2.disp
-    Dt = promote_type(eltype(disp1), eltype(disp2))
-    disp′ = zeros(Dt, 2*nmodes)
-    @inbounds for i in block1
-        disp′[i] = disp1[i]
-    end
-    @inbounds for i in block2
-        disp′[i+2*nmodes1] = disp2[i]
-    end
-    # initialize direct sum of symplectic matrices
-    symp1, symp2 = op1.symplectic, op2.symplectic
-    St = promote_type(eltype(symp1), eltype(symp2))
-    symp′ = zeros(St, 2*nmodes, 2*nmodes)
-    @inbounds for i in block1, j in block1
-        symp′[i,j] = symp1[i,j]
-    end
-    @inbounds for i in block2, j in block2
-        symp′[i+2*nmodes1,j+2*nmodes1] = symp2[i,j]
-        symp′[i+2*nmodes1,j+2*nmodes1] = symp2[i,j]
-    end
-    # extract output array types
-    disp′′ = _promote_output_vector(typeof(disp1), typeof(disp2), disp′)
-    symp′′ = _promote_output_matrix(typeof(symp1), typeof(symp2), symp′)
-    return disp′′, symp′′
+    return _directsummoments(op1.disp, op1.symplectic, op2.disp, op2.symplectic,
+                             _tensorperm(op1.basis, op2.basis))
 end
 function _tensor(op1::GaussianUnitary{B1,D1,S1}, op2::GaussianUnitary{B2,D2,S2}) where {B1<:QuadBlockBasis,B2<:QuadBlockBasis,D1,D2,S1,S2}
-    basis1, basis2 = op1.basis, op2.basis
-    nmodes1, nmodes2 = basis1.nmodes, basis2.nmodes
-    nmodes = nmodes1 + nmodes2
-    block1, block2 = Base.OneTo(nmodes1), Base.OneTo(nmodes2)
-    # initialize direct sum of displacement vectors
-    disp1, disp2 = op1.disp, op2.disp
-    Dt = promote_type(eltype(disp1), eltype(disp2))
-    disp′ = zeros(Dt, 2*nmodes)
-    @inbounds for i in block1
-        disp′[i] = disp1[i]
-        disp′[i+nmodes] = disp1[i+nmodes1]
-    end
-    @inbounds for i in block2
-        disp′[i+nmodes1] = disp2[i]
-        disp′[i+nmodes+nmodes1] = disp2[i+nmodes2]
-    end
-    # initialize direct sum of symplectic matrices
-    symp1, symp2 = op1.symplectic, op2.symplectic
-    St = promote_type(eltype(symp1), eltype(symp2))
-    symp′ = zeros(St, 2*nmodes, 2*nmodes)
-    @inbounds for i in block1, j in block1
-        symp′[i,j] = symp1[i,j]
-        symp′[i,j+nmodes] = symp1[i,j+nmodes1]
-        symp′[i+nmodes,j] = symp1[i+nmodes1,j]
-        symp′[i+nmodes,j+nmodes] = symp1[i+nmodes1,j+nmodes1]
-    end
-    @inbounds for i in block2, j in block2
-        symp′[i+nmodes1,j+nmodes1] = symp2[i,j]
-        symp′[i+nmodes1,j+nmodes+nmodes1] = symp2[i,j+nmodes2]
-        symp′[i+nmodes+nmodes1,j+nmodes1] = symp2[i+nmodes2,j]
-        symp′[i+nmodes+nmodes1,j+nmodes+nmodes1] = symp2[i+nmodes2,j+nmodes2]
-   end
-    # extract output array types
-    disp′′ = _promote_output_vector(typeof(disp1), typeof(disp2), disp′)
-    symp′′ = _promote_output_matrix(typeof(symp1), typeof(symp2), symp′)
-    return disp′′, symp′′
+    return _directsummoments(op1.disp, op1.symplectic, op2.disp, op2.symplectic,
+                             _tensorperm(op1.basis, op2.basis))
 end
 
 """
@@ -632,7 +571,7 @@ Inverse in the group law `(d₁,S₁)*(d₂,S₂) = (S₁d₂+d₁, S₁S₂)`. 
 inverted as `S⁻¹ = ΩSᵀΩᵀ`, which is exact and preserves `SΩSᵀ = Ω`.
 """
 function Base.inv(op::GaussianUnitary)
-    Omega = symplecticform(op.basis)
+    Omega = _symplecticform(op.basis, op.symplectic)
     symp = Omega * transpose(op.symplectic) * transpose(Omega)
     disp = -(symp * op.disp)
     disp′ = _promote_output_vector(typeof(op.disp), disp, length(disp))
@@ -659,30 +598,7 @@ end
 function embed(
     basis::QuadPairBasis, indices::Vector{<:Int}, op::GaussianUnitary{<:QuadPairBasis,D,S}
 ) where {D,S}
-    @assert length(indices) == op.basis.nmodes "Number of indices must match number of modes in the unitary"
-    @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
-
-    total_modes = basis.nmodes
-    sub_modes = op.basis.nmodes
-    disp = zeros(eltype(op.disp), 2 * total_modes)
-    symp = Matrix{eltype(op.symplectic)}(I, 2 * total_modes, 2 * total_modes)
-
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx = indices[i]
-        disp[2idx-1] = op.disp[2i-1]
-        disp[2idx] = op.disp[2i]
-    end
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx_i = indices[i]
-        @inbounds for j in Base.OneTo(sub_modes)
-            idx_j = indices[j]
-            symp[2idx_i-1, 2idx_j-1] = op.symplectic[2i-1, 2j-1]
-            symp[2idx_i-1, 2idx_j] = op.symplectic[2i-1, 2j]
-            symp[2idx_i, 2idx_j-1] = op.symplectic[2i, 2j-1]
-            symp[2idx_i, 2idx_j] = op.symplectic[2i, 2j]
-        end
-    end
-    return GaussianUnitary(basis, disp, symp; ħ = op.ħ)
+    return _embedunitary(basis, indices, op)
 end
 function embed(
     basis::QuadBlockBasis, index::Int, op::GaussianUnitary{<:QuadBlockBasis,D,S}
@@ -692,29 +608,23 @@ end
 function embed(
     basis::QuadBlockBasis, indices::Vector{<:Int}, op::GaussianUnitary{<:QuadBlockBasis,D,S}
 ) where {D,S}
+    return _embedunitary(basis, indices, op)
+end
+
+# Scatter the operator onto the identity at the quadratures owned by `indices`,
+# so the untouched modes are left alone.
+function _embedunitary(basis::SymplecticBasis, indices::Vector{<:Int}, op::GaussianUnitary)
     @assert length(indices) == op.basis.nmodes "Number of indices must match number of modes in the unitary"
     @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
-
-    total_modes = basis.nmodes
-    sub_modes = op.basis.nmodes
-    disp = zeros(eltype(op.disp), 2 * total_modes)
-    symp = Matrix{eltype(op.symplectic)}(I, 2 * total_modes, 2 * total_modes)
-
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx = indices[i]
-        disp[idx] = op.disp[i]
-        disp[idx + total_modes] = op.disp[i + sub_modes]
-    end
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx_i = indices[i]
-        @inbounds for j in Base.OneTo(sub_modes)
-            idx_j = indices[j]
-            symp[idx_i, idx_j] = op.symplectic[i, j]
-            symp[idx_i, idx_j + total_modes] = op.symplectic[i, j + sub_modes]
-            symp[idx_i + total_modes, idx_j] = op.symplectic[i + sub_modes, j]
-            symp[idx_i + total_modes, idx_j + total_modes] = op.symplectic[i + sub_modes, j + sub_modes]
-        end
-    end
+    dim = 2 * basis.nmodes
+    q = _quadindices(basis, indices)
+    disp = similar(op.disp, dim)
+    fill!(disp, zero(eltype(op.disp)))
+    symp = similar(op.symplectic, dim, dim)
+    fill!(symp, zero(eltype(op.symplectic)))
+    symp[diagind(symp)] .= oneunit(eltype(op.symplectic))
+    disp[q] = op.disp
+    symp[q, q] = op.symplectic
     return GaussianUnitary(basis, disp, symp; ħ = op.ħ)
 end
 
@@ -733,7 +643,7 @@ true
 ```
 """
 function issymplectic(basis::SymplecticBasis, x::T; atol::R1 = 0, rtol::R2 = atol) where {T,R1<:Real,R2<:Real}
-    form = symplecticform(basis)
+    form = _symplecticform(basis, x)
     return isapprox(x * form * x', form; atol = atol, rtol = rtol)
 end
 
@@ -775,32 +685,14 @@ symplectic: 4×4 Matrix{Float64}:
 ```
 """
 function changebasis(::Type{B1}, op::GaussianUnitary{B2,D,S}) where {B1<:QuadBlockBasis,B2<:QuadPairBasis,D,S}
-    basis = op.basis
-    nmodes = basis.nmodes
-    T = zeros(eltype(S), 2*nmodes, 2*nmodes)
-    @inbounds for i in Base.OneTo(2*nmodes), j in Base.OneTo(2*nmodes)
-        if (j == 2*i-1) || (j + 2*nmodes == 2*i)
-            T[i,j] = 1.0
-        end
-    end
-    T = typeof(T) == S ? T : S(T)
-    disp = T * op.disp
-    symp = T * op.symplectic * transpose(T)
-    return GaussianUnitary(B1(nmodes), disp, symp; ħ = op.ħ)
+    nmodes = op.basis.nmodes
+    p = _basisperm(B1, nmodes)
+    return GaussianUnitary(B1(nmodes), op.disp[p], op.symplectic[p, p]; ħ = op.ħ)
 end
 function changebasis(::Type{B1}, op::GaussianUnitary{B2,D,S}) where {B1<:QuadPairBasis,B2<:QuadBlockBasis,D,S}
-    basis = op.basis
-    nmodes = basis.nmodes
-    T = zeros(eltype(S), 2*nmodes, 2*nmodes)
-    @inbounds for i in Base.OneTo(2*nmodes), j in Base.OneTo(2*nmodes)
-        if (i == 2*j-1) || (i + 2*nmodes == 2*j)
-            T[i,j] = 1.0
-        end
-    end
-    T = typeof(T) == S ? T : S(T)
-    disp = T * op.disp
-    symp = T * op.symplectic * transpose(T)
-    return GaussianUnitary(B1(nmodes), disp, symp; ħ = op.ħ)
+    nmodes = op.basis.nmodes
+    p = _basisperm(B1, nmodes)
+    return GaussianUnitary(B1(nmodes), op.disp[p], op.symplectic[p, p]; ħ = op.ħ)
 end
 changebasis(::Type{<:QuadBlockBasis}, op::GaussianUnitary{<:QuadBlockBasis,D,S}) where {D,S} = op
 changebasis(::Type{<:QuadPairBasis}, op::GaussianUnitary{<:QuadPairBasis,D,S}) where {D,S} = op

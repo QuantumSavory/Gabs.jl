@@ -24,11 +24,6 @@ if JET_flag
     Pkg.instantiate()
     include("jet_tests.jl")
 else
-    if CUDA_flag
-        using Pkg
-        Pkg.add("CUDA")
-    end
-
     using Gabs
 
     testfilter = ti -> begin

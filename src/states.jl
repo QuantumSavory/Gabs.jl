@@ -490,73 +490,58 @@ function tensor(state1::GaussianState, state2::GaussianState)
     return GaussianState(state1.basis ⊕ state2.basis, mean, covar; ħ = state1.ħ)
 end
 function _tensor(state1::GaussianState{B1,M1,V1}, state2::GaussianState{B2,M2,V2}) where {B1<:QuadPairBasis,B2<:QuadPairBasis,M1,M2,V1,V2}
-    mean1, mean2 = state1.mean, state2.mean
-    Mt = promote_type(eltype(mean1), eltype(mean2))
-    basis1, basis2 = state1.basis, state2.basis
-    nmodes1, nmodes2 = basis1.nmodes, basis2.nmodes
-    nmodes = nmodes1 + nmodes2
-    block1, block2 = Base.OneTo(2*nmodes1), Base.OneTo(2*nmodes2)
-    # initialize direct sum of mean vectors
-    mean′ = zeros(Mt, 2*nmodes)
-    @inbounds for i in block1
-        mean′[i] = mean1[i]
+    return _directsummoments(state1.mean, state1.covar, state2.mean, state2.covar,
+                             _tensorperm(state1.basis, state2.basis))
+end
+function _tensor(state1::GaussianState{B1,M1,V1}, state2::GaussianState{B2,M2,V2}) where {B1<:QuadBlockBasis,B2<:QuadBlockBasis,M1,M2,V1,V2}
+    return _directsummoments(state1.mean, state1.covar, state2.mean, state2.covar,
+                             _tensorperm(state1.basis, state2.basis))
+end
+
+# Stack the two operands, then relabel. Concatenation already gives the direct
+# sum in the pairwise layout; the blockwise layout needs the quadratures of the
+# joint system regrouped, which `_tensorperm` expresses as a single gather.
+function _directsummoments(mean1, covar1, mean2, covar2, perm)
+    m1, m2 = _codevice(mean1, mean2)
+    mean′ = vcat(m1, m2)
+    n1, n2 = length(mean1), length(mean2)
+    covar′ = _blockdiag(covar1, covar2, n1, n2)
+    if perm !== nothing
+        mean′ = mean′[perm]
+        covar′ = covar′[perm, perm]
     end
-    @inbounds for i in block2
-        mean′[i+2*nmodes1] = mean2[i]
-    end
-    # initialize direct sum of covariance matrices
-    covar1, covar2 = state1.covar, state2.covar
-    Vt = promote_type(eltype(covar1), eltype(covar2))
-    covar′ = zeros(Vt, 2*nmodes, 2*nmodes)
-    @inbounds for i in block1, j in block1
-        covar′[i,j] = covar1[i,j]
-    end
-    @inbounds for i in block2, j in block2
-        covar′[i+2*nmodes1,j+2*nmodes1] = covar2[i,j]
-    end
-    # extract output array types
     mean′′ = _promote_output_vector(typeof(mean1), typeof(mean2), mean′)
     covar′′ = _promote_output_matrix(typeof(covar1), typeof(covar2), covar′)
     return mean′′, covar′′
 end
-function _tensor(state1::GaussianState{B1,M1,V1}, state2::GaussianState{B2,M2,V2}) where {B1<:QuadBlockBasis,B2<:QuadBlockBasis,M1,M2,V1,V2}
-    mean1, mean2 = state1.mean, state2.mean
-    Mt = promote_type(eltype(mean1), eltype(mean2))
-    basis1, basis2 = state1.basis, state2.basis
-    nmodes1, nmodes2 = basis1.nmodes, basis2.nmodes
-    nmodes = nmodes1 + nmodes2
-    block1, block2 = Base.OneTo(nmodes1), Base.OneTo(nmodes2)
-    # initialize direct sum of mean vectors
-    mean1, mean2 = state1.mean, state2.mean
-    mean′ = zeros(Mt, 2*nmodes)
-    @inbounds for i in block1
-        mean′[i] = mean1[i]
-        mean′[i+nmodes] = mean1[i+nmodes1]
-    end
-    @inbounds for i in block2
-        mean′[i+nmodes1] = mean2[i]
-        mean′[i+nmodes+nmodes1] = mean2[i+nmodes2]
-    end
-    # initialize direct sum of covariance matrices
-    covar1, covar2 = state1.covar, state2.covar
-    Vt = promote_type(eltype(covar1), eltype(covar2))
-    covar′ = zeros(Vt, 2*nmodes, 2*nmodes)
-    @inbounds for i in block1, j in block1
-        covar′[i,j] = covar1[i,j]
-        covar′[i,j+nmodes] = covar1[i,j+nmodes1]
-        covar′[i+nmodes,j] = covar1[i+nmodes1,j]
-        covar′[i+nmodes,j+nmodes] = covar1[i+nmodes1,j+nmodes1]
-    end
-    @inbounds for i in block2, j in block2
-        covar′[i+nmodes1,j+nmodes1] = covar2[i,j]
-        covar′[i+nmodes1,j+nmodes+nmodes1] = covar2[i,j+nmodes2]
-        covar′[i+nmodes+nmodes1,j+nmodes1] = covar2[i+nmodes2,j]
-        covar′[i+nmodes+nmodes1,j+nmodes+nmodes1] = covar2[i+nmodes2,j+nmodes2]
-    end
-    # extract output array types
-    mean′′ = _promote_output_vector(typeof(mean1), typeof(mean2), mean′)
-    covar′′ = _promote_output_matrix(typeof(covar1), typeof(covar2), covar′)
-    return mean′′, covar′′
+
+function _blockdiag(A, B, n1::Int, n2::Int)
+    A′, B′ = _codevice(A, B)
+    T = promote_type(eltype(A′), eltype(B′))
+    out = similar(A′, T, n1 + n2, n1 + n2)
+    fill!(out, zero(T))
+    @views out[1:n1, 1:n1] .= A′
+    @views out[n1+1:n1+n2, n1+1:n1+n2] .= B′
+    return out
+end
+
+"""
+    _codevice(A, B)
+
+`A` and `B` as a pair that can be combined directly.
+
+Two operands of a tensor product need not start on the same device; a backend
+that cannot read the other's memory defines this to bring both onto its own.
+"""
+_codevice(A, B) = (A, B)
+
+# Pairwise concatenation is already the direct sum, so no relabelling is needed.
+_tensorperm(::QuadPairBasis, ::QuadPairBasis) = nothing
+# Blockwise stacking gives [q⁽¹⁾,p⁽¹⁾,q⁽²⁾,p⁽²⁾]; the joint state wants
+# [q⁽¹⁾,q⁽²⁾,p⁽¹⁾,p⁽²⁾].
+function _tensorperm(basis1::QuadBlockBasis, basis2::QuadBlockBasis)
+    n1, n2 = basis1.nmodes, basis2.nmodes
+    return vcat(1:n1, 2*n1+1:2*n1+n2, n1+1:2*n1, 2*n1+n2+1:2*n1+2*n2)
 end
 
 """
@@ -629,65 +614,24 @@ function _ptrace(state::GaussianState{B,M,V}, indices::T) where {B<:QuadPairBasi
     basis, mean, covar = state.basis, state.mean, state.covar
     length(indices) < basis.nmodes || throw(ArgumentError(INDEX_ERROR))
     notindices = setdiff(1:basis.nmodes, indices)
-    notidxlength = length(notindices)
-    # initialize partial trace of mean vector
-    mean′ = zeros(eltype(mean), 2*notidxlength)
-    @inbounds for i in eachindex(notindices)
-        idx = notindices[i]
-        mean′[2*i-1] = mean[2*idx-1]
-        mean′[2*i] = mean[2*idx]
-    end
-    # initialize partial trace of covariance matrix
-    covar′ = zeros(eltype(covar), 2*notidxlength, 2*notidxlength)
-    @inbounds for i in eachindex(notindices)
-        idx = notindices[i]
-        @inbounds for j in i:notidxlength
-            otheridx = notindices[j]
-            covar′[2*i-1, 2*j-1] = covar[2*idx-1, 2*otheridx-1]
-            covar′[2*i-1, 2*j] = covar[2*idx-1, 2*otheridx]
-            covar′[2*i, 2*j-1] = covar[2*idx, 2*otheridx-1]
-            covar′[2*i, 2*j] = covar[2*idx, 2*otheridx]
-            covar′[2*j-1, 2*i-1] = covar[2*otheridx-1, 2*idx-1]
-            covar′[2*j-1, 2*i] = covar[2*otheridx-1, 2*idx]
-            covar′[2*j, 2*i-1] = covar[2*otheridx, 2*idx-1]
-            covar′[2*j, 2*i] = covar[2*otheridx, 2*idx]
-        end
-    end 
-    mean′′ = _promote_output_vector(typeof(mean), mean′, 2*notidxlength)
-    covar′′ = _promote_output_matrix(typeof(covar), covar′, 2*notidxlength)
-    return mean′′, covar′′
+    quad = _quadindices(basis, notindices)
+    return _gathermoments(mean, covar, quad)
 end
 function _ptrace(state::GaussianState{B,M,V}, indices::T) where {B<:QuadBlockBasis,M,V,T}
     basis, mean, covar = state.basis, state.mean, state.covar
-    nmodes = basis.nmodes
-    length(indices) < nmodes || throw(ArgumentError(INDEX_ERROR))
+    length(indices) < basis.nmodes || throw(ArgumentError(INDEX_ERROR))
     notindices = setdiff(1:basis.nmodes, indices)
-    notidxlength = length(notindices)
-    # initialize partial trace of mean vector
-    mean′ = zeros(eltype(mean), 2*notidxlength)
-    @inbounds for i in eachindex(notindices)
-        idx = notindices[i]
-        mean′[i] = mean[idx]
-        mean′[i+notidxlength] = mean[idx+nmodes]
-    end
-    # initialize partial trace of covariance matrix
-    covar′ = zeros(eltype(covar), 2*notidxlength, 2*notidxlength)
-    @inbounds for i in Base.OneTo(notidxlength)
-        idx = notindices[i]
-        @inbounds for j in i:notidxlength
-            otheridx = notindices[j]
-            covar′[i,j] = covar[idx,otheridx]
-            covar′[j,i] = covar[otheridx,idx]
-            covar′[i+notidxlength,j] = covar[idx+nmodes,otheridx]
-            covar′[i,j+notidxlength] = covar[idx,otheridx+nmodes]
-            covar′[j,i+notidxlength] = covar[otheridx,idx+nmodes]
-            covar′[j+notidxlength,i] = covar[otheridx+nmodes,idx]
-            covar′[i+notidxlength,j+notidxlength] = covar[idx+nmodes, otheridx+nmodes]
-            covar′[j+notidxlength,i+notidxlength] = covar[otheridx+nmodes, idx+nmodes]
-        end
-    end 
-    mean′′ = _promote_output_vector(typeof(mean), mean′, 2*notidxlength)
-    covar′′ = _promote_output_matrix(typeof(covar), covar′, 2*notidxlength)
+    quad = _quadindices(basis, notindices)
+    return _gathermoments(mean, covar, quad)
+end
+
+# Keeping a set of modes is a symmetric gather on the quadratures they own, so
+# one indexing expression serves both bases and every array backend.
+function _gathermoments(mean, covar, quad)
+    mean′ = mean[quad]
+    covar′ = covar[quad, quad]
+    mean′′ = _promote_output_vector(typeof(mean), mean′, length(quad))
+    covar′′ = _promote_output_matrix(typeof(covar), covar′, length(quad))
     return mean′′, covar′′
 end
 
@@ -738,35 +682,7 @@ end
 function embed(
     basis::QuadPairBasis, indices::Vector{<:Int}, state::GaussianState{<:QuadPairBasis,M,V}
 ) where {M,V}
-    @assert length(indices) == state.basis.nmodes "Number of indices must match number of modes in the state"
-    @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
-
-    total_modes = basis.nmodes
-    sub_modes = (state.basis).nmodes
-    dim = 2 * total_modes
-    ħ = state.ħ
-    # initialize mean and covariance with vacuum
-    mean = zeros(eltype(state.mean), dim)
-    covar = Matrix{eltype(state.covar)}(I, dim, dim) .* (ħ / 2)
-
-    # map substate mean and covar into full system
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx = indices[i]
-        mean[2idx-1] = state.mean[2i-1]
-        mean[2idx]   = state.mean[2i]
-    end
-
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx_i = indices[i]
-        @inbounds for j in Base.OneTo(sub_modes)
-            idx_j = indices[j]
-            covar[2idx_i-1, 2idx_j-1] = state.covar[2i-1, 2j-1]
-            covar[2idx_i-1, 2idx_j]   = state.covar[2i-1, 2j]
-            covar[2idx_i,   2idx_j-1] = state.covar[2i,   2j-1]
-            covar[2idx_i,   2idx_j]   = state.covar[2i,   2j]
-        end
-    end
-    return Gabs.GaussianState(basis, mean, covar; ħ)
+    return _embedstate(basis, indices, state)
 end
 function embed(
     basis::QuadBlockBasis, index::Int, state::GaussianState{<:QuadBlockBasis,M,V}
@@ -776,31 +692,24 @@ end
 function embed(
     basis::QuadBlockBasis, indices::Vector{<:Int}, state::GaussianState{<:QuadBlockBasis,M,V}
 ) where {M,V}
+    return _embedstate(basis, indices, state)
+end
+
+# Scatter the substate onto a vacuum background at the quadratures owned by
+# `indices`; the layout only enters through `_quadindices`.
+function _embedstate(basis::SymplecticBasis, indices::Vector{<:Int}, state::GaussianState)
     @assert length(indices) == state.basis.nmodes "Number of indices must match number of modes in the state"
     @assert basis.nmodes ≥ length(indices) "Target basis must be large enough"
-
-    total_modes = basis.nmodes
-    sub_modes = state.basis.nmodes
     ħ = state.ħ
-
-    mean = zeros(eltype(state.mean), 2 * total_modes)
-    covar = Matrix{eltype(state.covar)}(I*(ħ / 2), 2 * total_modes, 2 * total_modes)
-
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx = indices[i]
-        mean[idx] = state.mean[i]
-        mean[idx + total_modes] = state.mean[i + sub_modes]
-    end
-    @inbounds for i in Base.OneTo(sub_modes)
-        idx_i = indices[i]
-        @inbounds for j in Base.OneTo(sub_modes)
-            idx_j = indices[j]
-            covar[idx_i, idx_j] = state.covar[i, j]
-            covar[idx_i, idx_j + total_modes] = state.covar[i, j + sub_modes]
-            covar[idx_i + total_modes, idx_j] = state.covar[i + sub_modes, j]
-            covar[idx_i + total_modes, idx_j + total_modes] = state.covar[i + sub_modes, j + sub_modes]
-        end
-    end
+    dim = 2 * basis.nmodes
+    q = _quadindices(basis, indices)
+    mean = similar(state.mean, dim)
+    fill!(mean, zero(eltype(state.mean)))
+    covar = similar(state.covar, dim, dim)
+    fill!(covar, zero(eltype(state.covar)))
+    covar[diagind(covar)] .= eltype(state.covar)(ħ / 2)
+    mean[q] = state.mean
+    covar[q, q] = state.covar
     return GaussianState(basis, mean, covar; ħ)
 end
 
@@ -872,41 +781,13 @@ covariance: 4×4 Matrix{Float64}:
 """
 function changebasis(::Type{B1}, state::GaussianState{B2,M,V}) where {B1<:QuadBlockBasis,B2<:QuadPairBasis,M,V}
     nmodes = state.basis.nmodes
-    mean = similar(state.mean)
-    covar = similar(state.covar)
-    @inbounds for i in Base.OneTo(nmodes)
-        mean[i] = state.mean[2*i - 1]
-        mean[nmodes + i] = state.mean[2*i]
-        # split into two loops for better cache efficiency
-        @inbounds for j in Base.OneTo(nmodes)
-            covar[j, i] = state.covar[2*j - 1, 2*i - 1]
-            covar[nmodes + j, i] = state.covar[2*j, 2*i - 1]
-        end
-        @inbounds for j in Base.OneTo(nmodes)
-            covar[j, nmodes + i] = state.covar[2*j - 1, 2*i]
-            covar[nmodes + j, nmodes + i] = state.covar[2*j, 2*i]
-        end
-    end
-    return GaussianState(B1(nmodes), mean, covar; ħ = state.ħ)
+    p = _basisperm(B1, nmodes)
+    return GaussianState(B1(nmodes), state.mean[p], state.covar[p, p]; ħ = state.ħ)
 end
 function changebasis(::Type{B1}, state::GaussianState{B2,M,V}) where {B1<:QuadPairBasis,B2<:QuadBlockBasis,M,V}
     nmodes = state.basis.nmodes
-    mean = similar(state.mean)
-    covar = similar(state.covar)
-    @inbounds for i in Base.OneTo(nmodes)
-        mean[2*i - 1] = state.mean[i]
-        mean[2*i] = state.mean[nmodes + i]
-        # split into two loops for better cache efficiency
-        @inbounds for j in Base.OneTo(nmodes)
-            covar[2*j - 1, 2*i - 1] = state.covar[j, i]
-            covar[2*j, 2*i - 1] = state.covar[nmodes + j, i]
-        end
-        @inbounds for j in Base.OneTo(nmodes)
-            covar[2*j - 1, 2*i] = state.covar[j, nmodes + i]
-            covar[2*j, 2*i] = state.covar[nmodes + j, nmodes + i]
-        end
-    end
-    return GaussianState(B1(nmodes), mean, covar; ħ = state.ħ)
+    p = _basisperm(B1, nmodes)
+    return GaussianState(B1(nmodes), state.mean[p], state.covar[p, p]; ħ = state.ħ)
 end
 changebasis(::Type{<:QuadBlockBasis}, state::GaussianState{<:QuadBlockBasis,M,V}) where {M,V} = state
 changebasis(::Type{<:QuadPairBasis}, state::GaussianState{<:QuadPairBasis,M,V}) where {M,V} = state
@@ -925,7 +806,7 @@ changebasis(::Type{<:QuadBlockBasis}, x::StellarState{C,<:GaussianUnitary{<:Quad
 
 Compute the symplectic spectrum of a Gaussian state.
 """
-sympspectrum(state::GaussianState) = _sympspectrum(state.covar, x -> x > 0; pre = symplecticform(state.basis))
+sympspectrum(state::GaussianState) = _sympspectrum(state.covar, x -> x > 0; pre = _symplecticform(state.basis, state.covar))
 function _sympspectrum(M::AbstractMatrix{<:Number}, select::Function; pre::Union{Nothing, AbstractMatrix{<:Number}} = nothing, post::Union{Nothing, AbstractMatrix{<:Number}} = nothing, invscale::Union{Nothing, Real} = nothing)
     M = isnothing(pre) ? M : pre * M
     M = isnothing(post) ? M : M * post

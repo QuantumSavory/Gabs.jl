@@ -2,6 +2,9 @@
 
 ## v1.3.9 - dev
 
+- Add a CUDA extension: `CuArray`s can be given to any predefined state,
+  unitary or channel the way other custom array types can, and operations on
+  them keep their results on the device.
 - Add stellar state interface.
 
 ## v1.3.8 - 2026-08-04
