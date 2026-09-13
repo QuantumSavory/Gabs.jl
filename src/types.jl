@@ -115,9 +115,10 @@ end
 function Base.:(*)(op::GaussianUnitary, state::GaussianState)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
-    d, S, = op.disp, op.symplectic
-    mean′ = S * state.mean .+ d
-    covar′ = S * state.covar * transpose(S)
+    S, covar = _codevice(op.symplectic, state.covar)
+    d, mean = _codevice(op.disp, state.mean)
+    mean′ = S * mean .+ d
+    covar′ = S * covar * transpose(S)
     return GaussianState(state.basis, mean′, covar′; ħ = state.ħ)
 end
 """
@@ -128,7 +129,9 @@ In-place application of a Gaussian unitary `op` on a Gaussian state `state`.
 function apply!(state::GaussianState, op::GaussianUnitary)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
-    d, S = op.disp, op.symplectic
+    # the state is written in place, so the operator is what moves
+    _, S = _codevice(state.covar, op.symplectic)
+    _, d = _codevice(state.mean, op.disp)
     state.mean .= S * state.mean .+ d
     state.covar .= S * state.covar * transpose(S)
     return state
@@ -151,30 +154,16 @@ function apply!(
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
-    quad_indices = Vector{Int}(undef, 2length(indices))
-    @inbounds for (k, i) in enumerate(indices)
-        quad_indices[2k-1] = 2i - 1
-        quad_indices[2k]   = 2i
-    end
+    quad_indices = _quadindices(state.basis, indices)
+    return _applyunitary!(state, quad_indices, op)
+end
+# the column update reads the block the row update just wrote, so order matters.
+# blocks are materialized rather than viewed: mul! into a gather view misses BLAS
+function _applyunitary!(state::GaussianState, quad_indices, op::GaussianUnitary)
     d, S = op.disp, op.symplectic
-    m = length(quad_indices)
-    n = size(state.covar, 1)
-    mean_sub = @view state.mean[quad_indices]
-    covar_row = @view state.covar[quad_indices, :]
-    covar_col = @view state.covar[:, quad_indices]
-    # single scratch buffer, reused across the three products (reshaped for the column update)
-    buf = similar(state.covar, m, n)
-    buf_vec = @view buf[1:m]
-    # x̄[q] ← S x̄[q] + d
-    mul!(buf_vec, S, mean_sub)
-    mean_sub .= buf_vec .+ d
-    # V[q,:] ← S V[q,:]
-    mul!(buf, S, covar_row)
-    covar_row .= buf
-    # V[:,q] ← V[:,q] Sᵀ (reads the just-updated V[q,q] block)
-    buf_col = reshape(buf, n, m)
-    mul!(buf_col, covar_col, transpose(S))
-    covar_col .= buf_col
+    state.mean[quad_indices] = S * state.mean[quad_indices] .+ d
+    state.covar[quad_indices, :] = S * state.covar[quad_indices, :]
+    state.covar[:, quad_indices] = state.covar[:, quad_indices] * transpose(S)
     return state
 end
 function apply!(
@@ -185,34 +174,8 @@ function apply!(
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
-    l = length(indices)
-    quad_indices = Vector{Int}(undef, 2l)
-    @inbounds for (k, i) in enumerate(indices)
-        quad_indices[k]   = i
-        quad_indices[k+l] = i + state.basis.nmodes
-    end
-    d, S = op.disp, op.symplectic
-    m = length(quad_indices)
-    n = size(state.covar, 1)
-    mean_sub = @view state.mean[quad_indices]
-    covar_row = @view state.covar[quad_indices, :]
-    covar_col = @view state.covar[:, quad_indices]
-    # single scratch buffer, reused across the three products (reshaped for the column update)
-    buf = similar(state.covar, m, n)
-    buf_vec = @view buf[1:m]
-    # x̄[q] ← S x̄[q] + d
-    mul!(buf_vec, S, mean_sub)
-    mean_sub .= buf_vec .+ d
-    # V[q,:] ← S V[q,:]
-    mul!(buf, S, covar_row)
-    covar_row .= buf
-    # V[:,q] ← V[:,q] Sᵀ (reads the just-updated V[q,q] block)
-    buf_col = reshape(buf, n, m)
-    mul!(buf_col, covar_col, transpose(S))
-    covar_col .= buf_col
-    return state
+    return _applyunitary!(state, _quadindices(state.basis, indices), op)
 end
-
 Base.@deprecate(
     apply!(
         state::GaussianState,
@@ -292,9 +255,11 @@ nmodes(x::GaussianChannel) = nmodes(x.basis)
 function Base.:(*)(op::GaussianChannel, state::GaussianState)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
-    d, T, N = op.disp, op.transform, op.noise
-    mean′ = T * state.mean .+ d
-    covar′ = T * state.covar * transpose(T) .+ N
+    T, covar = _codevice(op.transform, state.covar)
+    d, mean = _codevice(op.disp, state.mean)
+    N = _like(covar, op.noise)
+    mean′ = T * mean .+ d
+    covar′ = T * covar * transpose(T) .+ N
     return GaussianState(state.basis, mean′, covar′; ħ = state.ħ)
 end
 """
@@ -308,7 +273,9 @@ Gaussian state `state`.
 function apply!(state::GaussianState, op::GaussianChannel)
     op.basis == state.basis || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
-    d, T, N = op.disp, op.transform, op.noise
+    _, T = _codevice(state.covar, op.transform)
+    _, d = _codevice(state.mean, op.disp)
+    N = _like(state.covar, op.noise)
     state.mean .= T * state.mean .+ d
     state.covar .= T * state.covar * transpose(T) .+ N
     return state
@@ -324,34 +291,7 @@ function apply!(
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
-    quad_indices = Vector{Int}(undef, 2length(indices))
-    @inbounds for (k, i) in enumerate(indices)
-        quad_indices[2k-1] = 2i - 1
-        quad_indices[2k]   = 2i
-    end
-    d, T, N = op.disp, op.transform, op.noise
-    m = length(quad_indices)
-    n = size(state.covar, 1)
-    mean_sub = @view state.mean[quad_indices]
-    covar_row = @view state.covar[quad_indices, :]
-    covar_col = @view state.covar[:, quad_indices]
-    # single scratch buffer, reused across the three products (reshaped for the column update)
-    buf = similar(state.covar, m, n)
-    buf_vec = @view buf[1:m]
-    # x̄[q] ← T x̄[q] + d
-    mul!(buf_vec, T, mean_sub)
-    mean_sub .= buf_vec .+ d
-    # V[q,:] ← T V[q,:]
-    mul!(buf, T, covar_row)
-    covar_row .= buf
-    # V[:,q] ← V[:,q] Tᵀ (reads the just-updated V[q,q] block)
-    buf_col = reshape(buf, n, m)
-    mul!(buf_col, covar_col, transpose(T))
-    covar_col .= buf_col
-    # V[q,q] ← V[q,q] + N after both covariance transformations
-    covar_sub = @view state.covar[quad_indices, quad_indices]
-    covar_sub .+= N
-    return state
+    return _applychannel!(state, _quadindices(state.basis, indices), op)
 end
 function apply!(
     state::GaussianState{B,M,V},
@@ -361,37 +301,17 @@ function apply!(
     typeof(op.basis) == typeof(state.basis) || throw(DimensionMismatch(ACTION_ERROR))
     op.ħ == state.ħ || throw(ArgumentError(HBAR_ERROR))
     length(indices) ≤ state.basis.nmodes || throw(ArgumentError(INDEX_ERROR))
-    l = length(indices)
-    quad_indices = Vector{Int}(undef, 2l)
-    @inbounds for (k, i) in enumerate(indices)
-        quad_indices[k]   = i
-        quad_indices[k+l] = i + state.basis.nmodes
-    end
+    return _applychannel!(state, _quadindices(state.basis, indices), op)
+end
+function _applychannel!(state::GaussianState, quad_indices, op::GaussianChannel)
     d, T, N = op.disp, op.transform, op.noise
-    m = length(quad_indices)
-    n = size(state.covar, 1)
-    mean_sub = @view state.mean[quad_indices]
-    covar_row = @view state.covar[quad_indices, :]
-    covar_col = @view state.covar[:, quad_indices]
-    # single scratch buffer, reused across the three products (reshaped for the column update)
-    buf = similar(state.covar, m, n)
-    buf_vec = @view buf[1:m]
-    # x̄[q] ← T x̄[q] + d
-    mul!(buf_vec, T, mean_sub)
-    mean_sub .= buf_vec .+ d
-    # V[q,:] ← T V[q,:]
-    mul!(buf, T, covar_row)
-    covar_row .= buf
-    # V[:,q] ← V[:,q] Tᵀ (reads the just-updated V[q,q] block)
-    buf_col = reshape(buf, n, m)
-    mul!(buf_col, covar_col, transpose(T))
-    covar_col .= buf_col
+    state.mean[quad_indices] = T * state.mean[quad_indices] .+ d
+    state.covar[quad_indices, :] = T * state.covar[quad_indices, :]
+    state.covar[:, quad_indices] = state.covar[:, quad_indices] * transpose(T)
     # V[q,q] ← V[q,q] + N after both covariance transformations
-    covar_sub = @view state.covar[quad_indices, quad_indices]
-    covar_sub .+= N
+    state.covar[quad_indices, quad_indices] = state.covar[quad_indices, quad_indices] .+ N
     return state
 end
-
 """
 Defines a stellar state for an N-mode bosonic system: a Gaussian unitary applied to a
 core state of finite Fock support.
@@ -603,11 +523,17 @@ symplectic: 2×2 Matrix{Float64}:
 julia> isgaussian(op)
 true
 ```
+
+!!! note
+    The default `atol = 0` tests semidefiniteness exactly. A pure state sits on
+    that boundary, where the smallest eigenvalues are zero and different
+    eigensolvers round them either way, so pass an `atol` when the answer should
+    not depend on that.
 """
 function isgaussian(x::GaussianState; atol::R1 = 0, rtol::R2 = atol) where {R1<:Real, R2<:Real}
     covar = x.covar
     basis = x.basis
-    form = symplecticform(Matrix{ComplexF64}, basis)
+    form = _complexform(basis, covar)
     @. form = im * (x.ħ/2) * form + covar
     eigs = real(eigvals(form))
     return all(i -> ((i >= 0) || isapprox(i, 0.0; atol = atol, rtol = rtol)), eigs)
@@ -618,7 +544,7 @@ end
 function isgaussian(x::GaussianChannel; atol::R1 = 0, rtol::R2 = atol) where {R1<:Real, R2<:Real} 
     transform, noise = x.transform, x.noise
     basis = x.basis
-    form = symplecticform(Matrix{ComplexF64}, basis)
+    form = _complexform(basis, transform)
     prod = transform * form * transform'
     @. form = noise + im*form - im*prod
     eigs = real(eigvals(form))

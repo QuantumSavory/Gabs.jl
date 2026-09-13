@@ -2,6 +2,10 @@
 
 ## v1.3.9 - dev
 
+- Add a CUDA extension, so `CuArray`s can be used wherever other custom array
+  types are, and operations on them return results on the device.
+- `wigner`, `wignerchar`, `cross_wigner`, and `cross_wignerchar` now accept a
+  matrix of phase space points and return one value per column.
 - Add stellar state interface.
 
 ## v1.3.8 - 2026-08-04

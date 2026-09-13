@@ -12,6 +12,19 @@ steps:
       - JuliaCI/julia-coverage#v1:
           codecov: true
 
+  - label: "CUDA Tests"
+    plugins:
+      - QuantumSavory/julia#v1:
+          version: "1"
+      - JuliaCI/julia-test#v1: ~
+    agents:
+      queue: "juliagpu"
+      cuda: "*"
+    env:
+      CUDA_TEST: "true"
+    # the extension is only exercised where a device is actually present
+    soft_fail: false
+
   - label: "Downstream Tests - QuantumSavory"
     plugins:
       - QuantumSavory/julia#v1:

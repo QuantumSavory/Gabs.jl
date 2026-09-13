@@ -13,16 +13,19 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SymplecticMatrices = "d07eab47-f98b-4620-8fe1-ee63e153d4ef"
 
 [weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 QuantumOpticsBase = "4f57444f-1401-5e15-980d-4471b28d5678"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [extensions]
+CUDAExt = "CUDA"
 MakieExt = "Makie"
 QuantumOpticsBaseExt = "QuantumOpticsBase"
 StaticArraysExt = "StaticArrays"
 
 [compat]
+CUDA = "5"
 LinearAlgebra = "1.9"
 Makie = "0.22.8, 0.23, 0.24"
 QuantumInterface = "0.3.8, 0.4.1"
