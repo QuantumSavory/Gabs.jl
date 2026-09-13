@@ -594,28 +594,15 @@ The normalization is chosen to ensure the identity property `W₁₁(x) = W₁(x
 """
 function cross_wigner(state1::GaussianState, state2::GaussianState, x::AbstractVector)
     μ1, μ2 = state1.mean, state2.mean
-    V1, V2 = state1.covar, state2.covar
     n = length(μ1) ÷ 2
     ħ = state1.ħ
-    dx = similar(x)
-    Vavg = similar(V1)
-    @inbounds @. dx = x - 0.5 * (μ1 + μ2)
-    @inbounds @. Vavg = 0.5 * (V1 + V2)
-    Ω = symplecticform(state1.basis)
-    phase_arg = zero(real(eltype(μ1)))
-    @inbounds for i in eachindex(μ1)
-        Δμi = μ1[i] - μ2[i]
-        Ω_dx_i = zero(eltype(dx))
-        @simd for j in eachindex(dx)
-            Ω_dx_i += Ω[i,j] * dx[j]
-        end
-        phase_arg += Δμi * Ω_dx_i
-    end
-    phase = cis(phase_arg / ħ)
-    lognorm = -n*log(2π) - 0.5*logdet(Vavg)
-    norm = exp(lognorm)
-    gauss = exp(-0.5 * dot(dx, Vavg \ dx))  
-    return norm * gauss * phase
+    Vavg = (state1.covar .+ state2.covar) ./ 2
+    dx = x .- (μ1 .+ μ2) ./ 2
+    Ω = _symplecticform(state1.basis, Vavg)
+    phase_arg = dot(μ1 .- μ2, Ω * dx)
+    lognorm = -n*log(2π) - 0.5*_logdet(Vavg)
+    gauss = exp(-0.5 * dot(dx, Vavg \ dx))
+    return exp(lognorm) * gauss * cis(phase_arg / ħ)
 end
 
 """
@@ -655,14 +642,16 @@ Compute Wigner function of a linear combination including quantum interference.
 """
 function wigner(lc::GaussianLinearCombination, x::AbstractVector)
     length(x) == length(lc.states[1].mean) || throw(ArgumentError(WIGNER_ERROR))
-    result = 0.0
+    # seeded from the first term rather than a `0.0` literal, so the running sum
+    # takes the element type the states actually carry
+    c1, s1 = lc[1]
+    result = abs2(c1) * wigner(s1, x)
     @inbounds for i in 1:length(lc)
         ci, si = lc[i]
-        result += abs2(ci) * wigner(si, x)
-        @inbounds for j in (i+1):length(lc)
+        i > 1 && (result += abs2(ci) * wigner(si, x))
+        for j in (i+1):length(lc)
             cj, sj = lc[j]
-            cross_term = 2 * real(conj(ci) * cj * cross_wigner(si, sj, x))
-            result += cross_term
+            result += 2 * real(conj(ci) * cj * cross_wigner(si, sj, x))
         end
     end
     return result
@@ -705,26 +694,12 @@ function cross_wignerchar(state1::GaussianState, state2::GaussianState, xi::Abst
     if state1 === state2
         return wignerchar(state1, xi)
     end
-    μ1, μ2 = state1.mean, state2.mean
-    V1, V2 = state1.covar, state2.covar
-    μ12 = similar(μ1)
-    V12 = similar(V1)
-    temp_vec = similar(μ1)
-    temp_mat = similar(V1)
-    @inbounds @simd for i in eachindex(μ1)
-        μ12[i] = (μ1[i] + μ2[i]) * 0.5  
-    end
-    @inbounds @simd for i in eachindex(V1)
-        V12[i] = (V1[i] + V2[i]) * 0.5
-    end
-    Omega = symplecticform(state1.basis)
-    mul!(temp_mat, Omega, V12)              
-    mul!(V12, temp_mat, Omega)              
-    V12 .*= -1                              
-    mul!(temp_vec, V12, xi)                
-    arg1 = -0.5 * dot(xi, temp_vec)
-    mul!(temp_vec, Omega, μ12)              
-    arg2 = 1im * dot(temp_vec, xi)
+    μ12 = (state1.mean .+ state2.mean) ./ 2
+    V12 = (state1.covar .+ state2.covar) ./ 2
+    Omega = _symplecticform(state1.basis, V12)
+    M = -(Omega * V12 * Omega)
+    arg1 = -0.5 * dot(xi, M * xi)
+    arg2 = 1im * dot(Omega * μ12, xi)
     return exp(arg1 - arg2)
 end
 
@@ -776,14 +751,15 @@ Compute Wigner characteristic function of a linear combination including interfe
 """
 function wignerchar(lc::GaussianLinearCombination, xi::AbstractVector)
     length(xi) == length(lc.states[1].mean) || throw(ArgumentError(WIGNER_ERROR))
-    result = 0.0 + 0.0im
+    # see `wigner` above on why the sum is seeded from the first term
+    c1, s1 = lc[1]
+    result = complex(abs2(c1) * wignerchar(s1, xi))
     @inbounds for i in 1:length(lc)
         ci, si = lc[i]
-        result += abs2(ci) * wignerchar(si, xi)        
-        @inbounds for j in (i+1):length(lc)
+        i > 1 && (result += abs2(ci) * wignerchar(si, xi))
+        for j in (i+1):length(lc)
             cj, sj = lc[j]
-            cross_term = 2 * real(conj(ci) * cj * cross_wignerchar(si, sj, xi))
-            result += cross_term
+            result += 2 * real(conj(ci) * cj * cross_wignerchar(si, sj, xi))
         end
     end
     return result

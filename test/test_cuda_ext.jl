@@ -149,6 +149,19 @@
             @test Array(wigner(lcg, xg)) ≈ wigner(lcc, xs)
             @test Array(wignerchar(lcg, xg)) ≈ wignerchar(lcc, xs)
             @test wigner(lcg, xg) isa CuVector
+
+            # the single-point forms of the same functions, which reach the
+            # interference sum and the cross terms through a different path
+            x1 = xs[:, 1]
+            xd = CuVector{Float64}(x1)
+            @test cross_wigner(tg, v1, xd) ≈ cross_wigner(tc, u1, x1)
+            @test cross_wignerchar(tg, v1, xd) ≈ cross_wignerchar(tc, u1, x1)
+            @test wigner(lcg, xd) ≈ wigner(lcc, x1)
+            @test wignerchar(lcg, xd) ≈ wignerchar(lcc, x1)
+            # cross_wigner of a state with itself is its own Wigner function
+            @test cross_wigner(tg, tg, xd) ≈ wigner(tg, xd)
+            # and the pair is Hermitian
+            @test cross_wigner(tg, v1, xd) ≈ conj(cross_wigner(v1, tg, xd))
         end
 
         @testset "$(nameof(B)): random objects" begin
