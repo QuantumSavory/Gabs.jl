@@ -23,7 +23,7 @@ QuantumOpticsBaseExt = "QuantumOpticsBase"
 StaticArraysExt = "StaticArrays"
 
 [compat]
-LinearAlgebra = "1.9"
+LinearAlgebra = "1.9, < 0.0.1, 1.6"
 Makie = "0.22.8, 0.23, 0.24"
 QuantumInterface = "0.3.8, 0.4.1"
 QuantumOpticsBase = "0.5"
