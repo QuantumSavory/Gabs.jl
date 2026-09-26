@@ -13,7 +13,59 @@ function wigner(state::GaussianState, x::T) where {T}
     diff = x .- mean
     arg = -(1/2) * transpose(diff) * inv(V) * diff
 
-    return exp(arg)/((2pi)^nmodes * sqrt(det(V)))
+    return exp(arg)/((2pi)^nmodes * sqrt(_det(V)))
+end
+
+"""
+    wigner(state::GaussianState, xs::AbstractMatrix)
+
+Compute the Wigner function of an N-mode Gaussian state at each column of `xs`,
+a matrix of size 2N x M. The covariance is factorized once for the whole set.
+
+## Example
+
+```jldoctest
+julia> state = coherentstate(QuadPairBasis(1), 1.0+im);
+
+julia> xs = [0.0 2.0; 0.0 2.0];
+
+julia> wigner(state, xs) ≈ [wigner(state, xs[:, 1]), wigner(state, xs[:, 2])]
+true
+```
+"""
+function wigner(state::GaussianState, xs::AbstractMatrix)
+    basis = state.basis
+    nmodes = basis.nmodes
+    mean = state.mean
+    size(xs, 1) == length(mean) || throw(ArgumentError(WIGNER_ERROR))
+
+    V = state.covar
+    diff = xs .- mean
+    # sum over the quadratures of each column, leaving one exponent per point
+    args = -(1/2) .* vec(sum(diff .* (V \ diff); dims = 1))
+
+    return exp.(args) ./ ((2pi)^nmodes * sqrt(_det(V)))
+end
+
+"""
+    wignerchar(state::GaussianState, xis::AbstractMatrix)
+
+Compute the Wigner characteristic function of an N-mode Gaussian state at each
+column of `xis`, a matrix of size 2N x M.
+"""
+function wignerchar(state::GaussianState, xis::AbstractMatrix)
+    basis = state.basis
+    mean = state.mean
+    size(xis, 1) == length(mean) || throw(ArgumentError(WIGNER_ERROR))
+
+    V = state.covar
+    Omega = _symplecticform(basis, V)
+    M = Omega * V * transpose(Omega)
+
+    args1 = -(1/2) .* vec(sum(xis .* (M * xis); dims = 1))
+    args2 = im .* vec(transpose(Omega * mean) * xis)
+
+    return exp.(args1 .- args2)
 end
 
 """
@@ -86,7 +138,7 @@ function wignerchar(state::GaussianState, xi::T) where {T}
     isequal(length(mean), length(xi)) || throw(ArgumentError(WIGNER_ERROR))
 
     V = state.covar
-    Omega = symplecticform(basis)
+    Omega = _symplecticform(basis, V)
 
     arg1 = -(1/2) * transpose(xi) * (Omega*V*transpose(Omega))*xi
     arg2 = im * transpose(Omega*mean) * xi

@@ -15,3 +15,8 @@ end
 Base.@propagate_inbounds function _promote_output_matrix(::Type{T}, mat_out, out_dim::Td) where {T,Td<:Tuple}
     T <: Matrix{Float64} ? mat_out : T(mat_out)
 end
+
+# hooks: det/logdet read the LU diagonal elementwise, which some array backends
+# disallow; those define these over a factorization they support
+_det(A) = det(A)
+_logdet(A) = logdet(A)

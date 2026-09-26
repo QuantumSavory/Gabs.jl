@@ -175,6 +175,61 @@ Use [Latexify](https://github.com/korsbo/Latexify.jl) to render the covariance m
 
 ## GPU Acceleration
 
+A GPU array is a custom array like any other, so the section above already
+covers it: load [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl) and name
+`CuVector`/`CuMatrix` where the previous examples named `SVector` and `SMatrix`.
+
+```julia
+julia> using CUDA
+
+julia> state = squeezedstate(CuVector{Float32}, CuMatrix{Float32}, QuadPairBasis(1), 0.5, pi/4)
+GaussianState for 1 mode.
+  symplectic basis: QuadPairBasis
+mean: 2-element CuArray{Float32, 1, CUDA.DeviceMemory}:
+ 0.0
+ 0.0
+covariance: 2×2 CuArray{Float32, 2, CUDA.DeviceMemory}:
+  0.712088  -0.830993
+ -0.830993   2.37407
+```
+
+Every predefined state, unitary and channel takes the array type this way.
+Operations on them return objects whose moments are still `CuArray`s, including
+`*`, [`apply!`](@ref), [`tensor`](@ref), [`ptrace`](@ref), [`embed`](@ref),
+[`changebasis`](@ref), [`wigner`](@ref), the metrics, the random constructors
+and the measurements:
+
+```julia
+julia> op = beamsplitter(CuVector{Float32}, CuMatrix{Float32}, QuadPairBasis(2), 0.4);
+
+julia> out = op * (state ⊗ state);
+
+julia> typeof(out.covar)
+CuArray{Float32, 2, CUDA.DeviceMemory}
+```
+
+A host operand mixed with a device one is moved to the device, so
+`state ⊗ cpu_state` also returns a GPU-backed state. Convert the fields with
+`Array` to bring a result back.
+
+[`wigner`](@ref), [`wignerchar`](@ref), [`cross_wigner`](@ref) and
+[`cross_wignerchar`](@ref) also take a `2N x M` matrix whose columns are points
+and return one value per column, factorizing the covariance once for the set:
+
+```julia
+julia> grid = reduce(hcat, [[x, p] for x in -3:0.05:3, p in -3:0.05:3]);
+
+julia> w = wigner(state, CuMatrix{Float32}(grid));
+```
+
+!!! note
+    The GPU pays off once there is enough work to cover a kernel launch. On an
+    RTX 2080 Ti, applying a Gaussian unitary breaks even near 64 modes and is
+    about 85x faster at 1024, while below 32 modes the CPU is quicker. Batched
+    `wigner` over 25,000 points is about 2.6x the same batched call on the CPU,
+    and 36x a loop over single points; most of that second figure is the
+    batching, which helps the CPU equally.
+
 ## Multithreading
 
 ## Benchmarking and Profiling
