@@ -173,9 +173,87 @@ Use [Latexify](https://github.com/korsbo/Latexify.jl) to render the covariance m
 \end{equation}
 ```
 
+## Quantum State Tomography
+
+Quantum state tomography is the process of reconstructing a quantum state from measurement data. For continuous-variable (CV) systems, this often involves homodyne measurements and the reconstruction of the Wigner function or the state’s covariance matrix.
+
+Below is a basic example of simulating homodyne measurements and reconstructing the Wigner function for a single-mode Gaussian state using Gabs.jl:
+
+```@example
+using Gabs, CairoMakie, Random, Statistics
+basis = QuadPairBasis(1)
+state = squeezedstate(basis, 0.7, π/4)
+
+# Simulate homodyne measurements (q quadrature)
+num_samples = 1000
+θ = 0.0
+samples = rand(Homodyne, state, [1], [θ]; shots=num_samples)
+
+# Estimate the mean and variance from samples
+mean_est = mean(samples)
+var_est = var(samples)
+
+# Reconstruct a Gaussian state from estimated parameters
+recon_state = GaussianState(basis, [mean_est, 0.0], [var_est 0.0; 0.0 1/var_est])
+
+# Plot the Wigner function of the reconstructed state
+q, p = collect(-4.0:0.2:4.0), collect(-4.0:0.2:4.0)
+fig = Figure(fontsize=15, size = (375, 300))
+ax = Axis(fig[1,1], xlabel = L"q", ylabel = L"p")
+hm = heatmap!(ax, q, p, recon_state, dist = :wigner, colormap = :viridis)
+Colorbar(fig[1,2], hm)
+fig
+```
+
+This example demonstrates a simple workflow for quantum state tomography in the Gaussian regime. For more advanced or non-Gaussian tomography, see the [manual](@ref Manual).
+
 ## GPU Acceleration
+
+Gabs.jl can leverage GPU acceleration for certain linear algebra operations by using Julia's GPU ecosystem, such as CUDA.jl or ArrayFire.jl. To use GPU arrays, simply construct your Gaussian states or operations with GPU-backed arrays (e.g., `CuArray`). Most functions will work transparently as long as the underlying array types support the required operations.
+
+Example:
+```julia
+using CUDA, Gabs, LinearAlgebra
+basis = QuadPairBasis(1)
+mean = CUDA.zeros(2)
+covar = CuMatrix{Float32}(I, 2, 2)
+state = GaussianState(basis, mean, covar)
+```
+Note: Not all features are guaranteed to be GPU-compatible. For best performance, ensure all arrays in your workflow are on the GPU.
 
 ## Multithreading
 
+Many operations in Gabs.jl, especially those involving large numbers of samples or independent computations (such as Monte Carlo simulations or batch state evolution), can benefit from Julia's multithreading. You can use Julia's `Threads.@threads` macro or parallel map functions to distribute work across CPU threads.
+
+Example:
+```julia
+using Gabs, Base.Threads
+basis = QuadPairBasis(1)
+states = [coherentstate(basis, α) for α in 1:100]
+results = Vector{Float64}(undef, 100)
+@threads for i in 1:100
+  results[i] = wigner(states[i], [0.0, 0.0])
+end
+```
+Adjust the number of threads with the `JULIA_NUM_THREADS` environment variable.
+
 ## Benchmarking and Profiling
+
+To optimize performance, use Julia's built-in benchmarking and profiling tools. The `BenchmarkTools.jl` package provides robust macros for timing code, while Julia's `@profile` macro and ProfileView.jl can help identify bottlenecks.
+
+Example:
+```julia
+using Gabs, BenchmarkTools
+basis = QuadPairBasis(1)
+state = vacuumstate(basis)
+@btime wigner($state, [0.0, 0.0])
+```
+For profiling:
+```julia
+using Profile
+@profile for i in 1:1000
+  wigner(state, [0.0, 0.0])
+end
+```
+Visualize profiling results with ProfileView.jl for deeper insights.
 
