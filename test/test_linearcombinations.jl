@@ -277,6 +277,84 @@
         end
     end
 
+    @testset "Gaussian Operator Arithmetic Interface" begin
+        basis = qpairbasis
+
+        @testset "GaussianUnitary linear combinations" begin
+            u1 = displace(basis, 0.25)
+            u2 = squeeze(basis, 0.2, π/7)
+
+            lc_u1 = GaussianLinearCombination(u1)
+            @test lc_u1 isa GaussianLinearCombination
+            @test length(lc_u1) == 1
+            @test lc_u1.coeffs == [1.0]
+            @test lc_u1.states == [u1]
+
+            lc_u2 = 0.4 * u2
+            @test lc_u2 isa GaussianLinearCombination
+            @test lc_u2.coeffs == [0.4]
+            @test lc_u2.states == [u2]
+
+            lc_usum = u1 + u2
+            @test lc_usum isa GaussianLinearCombination
+            @test lc_usum.coeffs == [1.0, 1.0]
+            @test lc_usum.states == [u1, u2]
+
+            lc_umix = u1 + lc_u2
+            @test lc_umix.coeffs == [1.0, 0.4]
+            @test lc_umix.states == [u1, u2]
+
+            lc_umix2 = lc_u2 - u1
+            @test lc_umix2.coeffs == [0.4, -1.0]
+            @test lc_umix2.states == [u2, u1]
+        end
+
+        @testset "GaussianChannel linear combinations" begin
+            c1 = attenuator(basis, π/8, 2)
+            c2 = amplifier(basis, 0.1, 1.2)
+
+            lc_c1 = GaussianLinearCombination(c1)
+            @test lc_c1 isa GaussianLinearCombination
+            @test length(lc_c1) == 1
+            @test lc_c1.coeffs == [1.0]
+            @test lc_c1.states == [c1]
+
+            lc_c2 = c2 * 0.3
+            @test lc_c2 isa GaussianLinearCombination
+            @test lc_c2.coeffs == [0.3]
+            @test lc_c2.states == [c2]
+
+            lc_csum = c1 + c2
+            @test lc_csum isa GaussianLinearCombination
+            @test lc_csum.coeffs == [1.0, 1.0]
+            @test lc_csum.states == [c1, c2]
+
+            lc_cmix = c1 - lc_c2
+            @test lc_cmix.coeffs == [1.0, -0.3]
+            @test lc_cmix.states == [c1, c2]
+
+            lc_cmix2 = lc_c2 + c1
+            @test lc_cmix2.coeffs == [0.3, 1.0]
+            @test lc_cmix2.states == [c2, c1]
+        end
+
+        @testset "Reject mixed Gaussian families" begin
+            state = coherentstate(basis, 0.3)
+            unitary = displace(basis, 0.2)
+            channel = attenuator(basis, π/6, 2)
+
+            lc_state = GaussianLinearCombination(state)
+            lc_unitary = GaussianLinearCombination(unitary)
+            lc_channel = GaussianLinearCombination(channel)
+
+            @test_throws ArgumentError lc_state + lc_unitary
+            @test_throws ArgumentError lc_unitary + lc_channel
+            @test_throws MethodError state + lc_unitary
+            @test_throws MethodError unitary + lc_state
+            @test_throws MethodError channel + lc_unitary
+        end
+    end
+
     @testset "Constructor validation" begin
         vac = vacuumstate(qpairbasis)
         vac_block = vacuumstate(qblockbasis)
