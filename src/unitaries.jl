@@ -538,6 +538,69 @@ function _beamsplitter(basis::QuadBlockBasis{N}, transmit::R) where {N<:Int,R<:V
     return disp, symplectic
 end
 
+"""
+Constructs the two-mode SUM gate as a Gaussian unitary operator.
+
+```jldoctest
+julia> sum_gate(QuadPairBasis(2))
+GaussianUnitary for 2 modes.
+  symplectic basis: QuadPairBasis
+displacement: 4-element Vector{Float64}:
+ 0.0
+ 0.0
+ 0.0
+ 0.0
+symplectic: 4×4 Matrix{Float64}:
+ 1.0  0.0  0.0   0.0
+ 0.0  1.0  0.0  -1.0
+ 1.0  0.0  1.0   0.0
+ 0.0  0.0  0.0   1.0
+```
+"""
+function sum_gate(::Type{Td}, ::Type{Ts}, basis::SymplecticBasis{N}; ħ = 2) where {Td, Ts, N}
+    disp, symplectic = _sum_gate(basis)
+    return GaussianUnitary(basis, Td(disp), Ts(symplectic); ħ = ħ)
+end
+function sum_gate(::Type{T}, basis::SymplecticBasis{N}; ħ = 2) where {T, N}
+    return sum_gate(T, T, basis; ħ = ħ)
+end
+function sum_gate(basis::SymplecticBasis{N}; ħ = 2) where {N}
+    disp, symplectic = _sum_gate(basis)
+    return GaussianUnitary(basis, disp, symplectic; ħ = ħ)
+end
+function _sum_gate(basis::QuadBlockBasis{N}) where {N<:Int}
+    nmodes = basis.nmodes
+    if nmodes != 2
+        error("SUM gate is defined for 2-mode systems only.")
+    end
+    disp = zeros(Float64, 2 * nmodes)
+    symplectic = zeros(Float64, 2 * nmodes, 2 * nmodes)
+    symplectic[1, 1] = 1.0
+    symplectic[2, 1] = 1.0
+    symplectic[2, 2] = 1.0
+    symplectic[3, 3] = 1.0
+    symplectic[3, 4] = -1.0
+    symplectic[4, 4] = 1.0
+    return disp, symplectic
+end
+function _sum_gate(basis::QuadPairBasis{N}) where {N<:Int}
+    nmodes = basis.nmodes
+    if nmodes != 2
+        error("SUM gate is defined for 2-mode systems only.")
+    end
+    disp = zeros(Float64, 2 * nmodes)
+    S = [1.0 0.0 0.0 0.0;
+         1.0 1.0 0.0 0.0;
+         0.0 0.0 1.0 -1.0;
+         0.0 0.0 0.0 1.0]
+    P = [1.0 0.0 0.0 0.0;
+         0.0 0.0 1.0 0.0;
+         0.0 1.0 0.0 0.0;
+         0.0 0.0 0.0 1.0]
+    symplectic = P * S * P'
+    return disp, symplectic
+end
+
 ##
 # Operations on Gaussian unitaries
 ##
